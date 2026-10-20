@@ -37,7 +37,7 @@ final class TitleIndex {
     private static final String TMDB = "https://api.themoviedb.org/3";
     private static final String POSTERS = "https://image.tmdb.org/t/p/w342";
     private static final long MAX_AGE_MS = 7L * 24 * 3600 * 1000;
-    private static final int FILE_VERSION = 1;
+    private static final int FILE_VERSION = 2;   // 2: popularity includes vote count
 
     /** One TMDB list to page through: {path, pages}. TMDB serves at most 500 pages (10,000 titles). */
     private static final Object[][] LISTS = {
@@ -68,6 +68,7 @@ final class TitleIndex {
     private final File file;
     private final String token;
     private volatile List<Entry> entries = Collections.emptyList();
+    private boolean oldFormat;
 
     TitleIndex(Context c, String tmdbToken) {
         this.file = new File(c.getFilesDir(), "titles.tsv");
@@ -76,7 +77,7 @@ final class TitleIndex {
 
     boolean enabled() { return token != null && !token.isEmpty(); }
     boolean ready() { return !entries.isEmpty(); }
-    boolean stale() { return !file.exists() || System.currentTimeMillis() - file.lastModified() > MAX_AGE_MS; }
+    boolean stale() { return oldFormat || !file.exists() || System.currentTimeMillis() - file.lastModified() > MAX_AGE_MS; }
 
     /** Loads the saved list, if any. Call off the main thread. */
     void load() {
@@ -84,7 +85,7 @@ final class TitleIndex {
         List<Entry> out = new ArrayList<>(30000);
         try (BufferedReader r = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
             String header = r.readLine();
-            if (header == null || !header.equals("v" + FILE_VERSION)) return;
+            if (header == null || !header.equals("v" + FILE_VERSION)) { oldFormat = true; return; }
             for (String line; (line = r.readLine()) != null; ) {
                 String[] f = line.split("\t", -1);
                 if (f.length < 5) continue;
@@ -122,7 +123,7 @@ final class TitleIndex {
                         String poster = m.isNull("poster_path") ? "" : m.optString("poster_path", "");
                         String id = (tv ? "tv/" : "movie/") + m.getLong("id");
                         byId.put(id, new Entry(id, title, date.length() >= 4 ? parseInt(date.substring(0, 4)) : 0,
-                                (float) m.optDouble("popularity", 0), poster));
+                                score(m.optDouble("popularity", 0), m.optInt("vote_count", 0)), poster));
                     }
                 } catch (Exception e) {
                     failed.incrementAndGet();
@@ -147,8 +148,18 @@ final class TitleIndex {
         if (!tmp.renameTo(file)) throw new Exception("Could not save title list");
         // Too many gaps (e.g. the TV slept mid-download): keep what we have, but try again next time.
         if (failed.get() > urls.size() / 20) file.setLastModified(0);
+        oldFormat = false;
         entries = out;
         Log.i(TAG, "Built " + out.size() + " titles (" + failed.get() + " of " + urls.size() + " pages failed)");
+    }
+
+    /**
+     * TMDB's popularity is what's trending this week, so on its own Hunter x Hunter (100, 2k votes)
+     * beats The Hunger Games (24, 24k votes). Adding the vote count lets well-known titles win while
+     * a new release that everyone's watching can still rise to the top.
+     */
+    private static float score(double popularity, int votes) {
+        return (float) (popularity + votes / 100.0);
     }
 
     private static String getWithRetry(String url, Map<String, String> headers) throws Exception {

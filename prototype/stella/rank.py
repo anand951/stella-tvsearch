@@ -66,7 +66,9 @@ def rank(titles, query, my_services):
 
     def relevance(t):
         name = _norm(t["title"])
-        return 0 if name == q else 1 if name.startswith(q) else 2 if q in name else 3
+        # "The Hunger Games" starts with "hun" as far as people are concerned.
+        bare = _norm(re.sub(r"(?i)^(the|a|an)\s+", "", t["title"] or ""))
+        return 0 if q in (name, bare) else 1 if name.startswith(q) or bare.startswith(q) else 2 if q in name else 3
 
     # The API also matches foreign and alternative titles, which look random. Keep titles whose
     # name contains the query, unless that leaves nothing (e.g. a typo).

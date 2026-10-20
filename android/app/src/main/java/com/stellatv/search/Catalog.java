@@ -131,7 +131,9 @@ final class Catalog {
 
     private static int relevance(Title t, String q) {
         String n = norm(t.title);
-        return n.equals(q) ? 0 : n.startsWith(q) ? 1 : n.contains(q) ? 2 : 3;
+        // "The Hunger Games" starts with "hun" as far as people are concerned.
+        String bare = t.title == null ? n : norm(t.title.replaceFirst("(?i)^(the|a|an)\\s+", ""));
+        return n.equals(q) || bare.equals(q) ? 0 : n.startsWith(q) || bare.startsWith(q) ? 1 : n.contains(q) ? 2 : 3;
     }
 
     static Set<String> csv(String s) {
