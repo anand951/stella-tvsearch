@@ -13,6 +13,8 @@ Test device: **NVIDIA SHIELD TV** (Android TV 11) running a custom launcher, wit
 | Streaming Availability API search | ✅ | Accurate, includes prices and direct links |
 | Disney+ direct link | ✅ | Plays the video after the profile picker |
 | Hulu direct link | ✅ | Opens the right title page after the profile picker |
+| HBO Max direct link (`videoLink`) | ✅ | Plays immediately, no profile picker |
+| Paramount+ link (`link`) | ✅ | Profile picker → plays the right movie |
 | Netflix direct link (`/watch/<id>`) | ✅ | **Plays**, but only when launched the "partner way" (see below). A plain VIEW intent stops at the profile picker |
 
 ## Google universal search
@@ -87,6 +89,8 @@ Each app registered web-URL intent filters for its own domain:
 |---|---|---|---|
 | Disney+ | `com.disney.disneyplus` | `https://www.disneyplus.com/video/<id>` | ✅ Profile picker → **plays** |
 | Hulu | `com.hulu.livingroomplus` | `https://www.hulu.com/watch/<id>` | ✅ Profile picker → title page (no Play button when the title isn't in the plan) |
+| HBO Max | `com.wbd.stream` | `https://play.hbomax.com/video/watch/<id>` (the API's `videoLink`; `play.max.com` also registered) | ✅ **Plays** straight away, no profile picker |
+| Paramount+ | `com.cbs.ott` | `https://www.paramountplus.com/movies/video/<id>/` (the API's `link`; no `videoLink` given) | ✅ Profile picker → **plays** the requested movie |
 | Netflix | `com.netflix.ninja` | `http://www.netflix.com/watch/<id>` with explicit component, flags and `source` extra (below) | ✅ **Plays** (profile picker skipped on a repeat launch) |
 
 ### Netflix needs the "partner" launch
