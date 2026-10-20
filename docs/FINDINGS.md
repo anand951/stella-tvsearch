@@ -52,9 +52,10 @@ am start -a android.intent.action.VIEW \
 - `<machineId>` is the server's `machineIdentifier` (from `GET /identity`). `<ratingKey>` comes from `/search`.
 - It opens the library item page (resolution, audio track and subtitle shown) with **Watch** focused. One OK press plays it in Plex's own player, so quality, audio passthrough, resume and watched status all behave normally.
 - `<slug>` was the lowercase title (`predator`). It's not yet checked whether the slug matters.
+- **TV shows:** `plex://libraries/<machineId>/show/<slug>/<showRatingKey>` opens the show page (seasons row, **Watch** focused). Tested with an 11-season show.
 - No autoplay parameter was found in the app.
 - Other app routes found in the bundle, not yet tested:
-  - `libraries/:serverId/show/:slug/:showKey/s/:seasonId/:seasonKey?/e/:episodeId/:episodeKey`: likely the episode page. TV shows still need a test.
+  - `libraries/:serverId/show/:slug/:showKey/s/:seasonId/:seasonKey?/e/:episodeId/:episodeKey`: likely the episode page. Not needed yet, because the show page's Watch button resumes the show.
   - `libraries/:serverId/collection/:key`
   - `libraries/:serverId/playlist/:keyName`
 - How it was found: the app is React Native. `strings` on `assets/index.android.bundle` in the APK shows the route table. The app accepts the prefixes `plex://`, `https://watch.plex.tv` and `https://watch.plextv.dev`.
