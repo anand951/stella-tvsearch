@@ -13,7 +13,7 @@ Test device: **NVIDIA SHIELD TV** (Android TV 11) running a custom launcher, wit
 | Streaming Availability API search | ✅ | Accurate, includes prices and direct links |
 | Disney+ direct link | ✅ | Plays the video after the profile picker |
 | Hulu direct link | ✅ | Opens the right title page after the profile picker |
-| Netflix direct link (`/watch/<id>`) | ⚠️ | Opens Netflix and the profile picker, then nothing |
+| Netflix direct link (`/watch/<id>`) | ✅ | **Plays**, but only when launched the "partner way" (see below). A plain VIEW intent stops at the profile picker |
 
 ## Google universal search
 
@@ -71,7 +71,27 @@ Each app registered web-URL intent filters for its own domain:
 |---|---|---|---|
 | Disney+ | `com.disney.disneyplus` | `https://www.disneyplus.com/video/<id>` | ✅ Profile picker → **plays** |
 | Hulu | `com.hulu.livingroomplus` | `https://www.hulu.com/watch/<id>` | ✅ Profile picker → title page (no Play button when the title isn't in the plan) |
-| Netflix | `com.netflix.ninja` | `https://www.netflix.com/watch/<id>` | ⚠️ Profile picker → nothing. Next to try: `/title/<id>` (also registered) and `nflx://` |
+| Netflix | `com.netflix.ninja` | `http://www.netflix.com/watch/<id>` with explicit component, flags and `source` extra (below) | ✅ **Plays** (profile picker skipped on a repeat launch) |
+
+### Netflix needs the "partner" launch
+
+What failed:
+- `am start -a VIEW -d https://www.netflix.com/watch/<id> com.netflix.ninja`: profile picker, then the home screen.
+- Same with `/title/<id>`: profile picker, then no playback.
+
+What works (cold start, tested twice):
+
+```
+am force-stop com.netflix.ninja
+am start -n com.netflix.ninja/.MainActivity -a android.intent.action.VIEW \
+  -d "http://www.netflix.com/watch/<id>" -f 0x10808000 -e source 30
+```
+
+- `-f 0x10808000` = `NEW_TASK | CLEAR_TOP | RESET_TASK_IF_NEEDED`-style flags.
+- `-e source 30` is the extra used by partner launchers. Netflix appears to ignore deep links without it.
+- On the second launch it went straight into playback with no profile picker.
+- Android equivalent: `Intent(ACTION_VIEW, uri).setClassName("com.netflix.ninja", "com.netflix.ninja.MainActivity").addFlags(0x10808000).putExtra("source", "30")`.
+- Other registered schemes, not needed so far: `nflx://www.netflix.com/...`, `/deeplink.*`, `/browse`.
 
 Notes:
 - Launch with an explicit package (`am start -a VIEW -d <url> <package>`) so the link doesn't open a browser.

@@ -10,7 +10,7 @@
 - Uses about 10 API calls.
 
 ## 2. Close the two launch gaps (needs the TV)
-- Netflix: test `/title/<id>` and `nflx://` links.
+- Netflix: ✅ solved with the partner-style launch (see FINDINGS).
 - Plex: test the Companion `playMedia` call. If it fails, build a direct-play fallback.
 
 ## 3. TV app (personal)

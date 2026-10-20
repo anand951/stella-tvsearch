@@ -34,7 +34,7 @@ Collapse duplicates by TMDB ID.
 
 ## Launching
 
-- **Streaming:** `Intent.ACTION_VIEW` with the provider's `videoLink` (or `link`) and an explicit package. Keep a per-service override table, because links behave differently (see FINDINGS: Netflix).
+- **Streaming:** `Intent.ACTION_VIEW` with the provider's `videoLink` (or `link`) and an explicit package. Keep a per-service override table, because links behave differently. Netflix needs an explicit component, flags `0x10808000` and extra `source=30` (see FINDINGS).
 - **Local:** an adapter-specific "play" action: a Plex Companion `playMedia` call (to be tested), Jellyfin and Kodi remote APIs, or a built-in direct-play player as a fallback.
 
 ## API budget
@@ -53,5 +53,4 @@ Collapse duplicates by TMDB ID.
 ## Open questions
 
 - Plex: does the Companion API work with the current Android TV client?
-- Netflix: which link form reliably reaches the title after the profile picker?
 - Can the app run as an ordinary app that also works as a launcher? Newer Google TV and Fire TV devices restrict replacement launchers.
