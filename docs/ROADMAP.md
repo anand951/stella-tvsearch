@@ -4,7 +4,7 @@
 - Tested Google search, JustWatch, Plex and streaming deep links on a SHIELD TV. See [FINDINGS.md](FINDINGS.md).
 - Picked the Streaming Availability API and validated it with test searches (Predator, Dangal).
 
-## 1. Command-line prototype (on a PC, no TV needed)
+## 1. Command-line prototype ✅ (October 2026, see prototype/)
 - `stella search "predator"`: the merged and ranked list from Plex plus the Streaming Availability API.
 - Proves matching (TMDB IDs), ranking and caching.
 - Uses about 10 API calls.
