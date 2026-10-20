@@ -230,6 +230,10 @@ public class SearchActivity extends Activity {
         posters.removeAllViews();
         posterScroll.scrollTo(0, 0);
         status.setText(q.isEmpty() ? "" : titles.size() == 1 ? "1 result" : titles.size() + " results");
+        if (!q.isEmpty() && streaming.enabled() && q.length() < MIN_STREAMING_CHARS) {
+            // Short queries search only the library (free); streaming lookups cost API calls.
+            status.setText(titles.size() + " in your library · type " + MIN_STREAMING_CHARS + "+ letters for streaming");
+        }
         if (titles.isEmpty()) {
             details.setVisibility(View.INVISIBLE);
             setBackdrop(null);
