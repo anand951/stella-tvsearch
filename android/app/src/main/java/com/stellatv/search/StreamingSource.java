@@ -32,22 +32,39 @@ final class StreamingSource {
         return apiKey != null && !apiKey.isEmpty();
     }
 
+    /** Title search. The API matches whole words only, so this is the fallback for full words. */
     List<Catalog.Title> search(String query) throws Exception {
-        String key = country + "|" + query.trim().toLowerCase();
-        File f = new File(cacheDir, sha(key) + ".json");
-        String body;
-        if (f.exists() && System.currentTimeMillis() - f.lastModified() < CACHE_MS) {
-            body = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
-        } else {
-            body = Http.getString(API + "/shows/search/title?country=" + country + "&series_granularity=show&title="
-                    + URLEncoder.encode(query.trim(), "UTF-8"), Collections.singletonMap("X-API-Key", apiKey));
-            cacheDir.mkdirs();
-            Files.write(f.toPath(), body.getBytes(StandardCharsets.UTF_8));
-        }
+        String body = cached("search|" + country + "|" + query.trim().toLowerCase(), API + "/shows/search/title?country="
+                + country + "&series_granularity=show&title=" + URLEncoder.encode(query.trim(), "UTF-8"));
         JSONArray shows = new JSONArray(body);
         List<Catalog.Title> out = new ArrayList<>();
         for (int i = 0; i < shows.length(); i++) out.add(title(shows.getJSONObject(i)));
         return out;
+    }
+
+    /** Where to watch one title, by TMDB id ("movie/106"). Returns null if the API doesn't know it. */
+    Catalog.Title lookup(String tmdb) throws Exception {
+        if (tmdb == null || !tmdb.matches("(movie|tv)/\\d+")) return null;
+        String body;
+        try {
+            body = cached("show|" + country + "|" + tmdb, API + "/shows/" + tmdb + "?country=" + country + "&series_granularity=show");
+        } catch (Exception e) {
+            if (String.valueOf(e.getMessage()).contains("404")) return null;
+            throw e;
+        }
+        return title(new JSONObject(body));
+    }
+
+    /** One API call per new key per day; repeats come from disk. */
+    private String cached(String key, String url) throws Exception {
+        File f = new File(cacheDir, sha(key) + ".json");
+        if (f.exists() && System.currentTimeMillis() - f.lastModified() < CACHE_MS) {
+            return new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+        }
+        String body = Http.getString(url, Collections.singletonMap("X-API-Key", apiKey));
+        cacheDir.mkdirs();
+        Files.write(f.toPath(), body.getBytes(StandardCharsets.UTF_8));
+        return body;
     }
 
     private Catalog.Title title(JSONObject s) {
@@ -59,6 +76,7 @@ final class StreamingSource {
         t.imdb = s.optString("imdbId", null);
         t.overview = s.optString("overview", null);
         t.runtimeMin = s.optInt("runtime", 0);
+        t.availabilityLoaded = true;
         JSONArray genres = s.optJSONArray("genres");
         for (int i = 0; genres != null && i < genres.length() && i < 3; i++) t.genres.add(genres.optJSONObject(i).optString("name"));
         JSONObject images = s.optJSONObject("imageSet");

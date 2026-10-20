@@ -31,7 +31,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -39,19 +42,25 @@ import java.util.concurrent.Future;
 
 /**
  * One search across the Plex library and the streaming services. Type a title; the poster row
- * shows every match, best way to watch first. OK on a poster opens it; Down shows other ways.
+ * shows every match (your library first, then the most popular). Where each title streams is
+ * looked up when you highlight it. OK on a poster opens it; Down shows other ways to watch.
  */
 public class SearchActivity extends Activity {
     private static final String TAG = "StellaSearch";
-    private static final long TYPING_PAUSE_MS = 900;
+    private static final long TYPING_PAUSE_MS = 350;          // local list: cheap to search often
+    private static final long TYPING_PAUSE_NO_INDEX_MS = 900; // streaming search costs an API call
     private static final int MIN_STREAMING_CHARS = 3;
-    private static final int MAX_RESULTS = 20;
+    private static final int MAX_RESULTS = 30;
+    private static final int MIN_FULL_WORD_FALLBACK = 4;
     private static final float POSTER_W = 230, POSTER_H = 345, RING = 11, FOCUS_SCALE = 1.07f;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newFixedThreadPool(2);
     private PlexSource plex;
     private StreamingSource streaming;
+    private TitleIndex index;
+    private final Set<Catalog.Title> lookingUp = new HashSet<>();
+    private final Map<Catalog.Title, TextView> badges = new HashMap<>();
     private Set<String> myServices;
 
     private FrameLayout root;
@@ -78,7 +87,9 @@ public class SearchActivity extends Activity {
         plex = new PlexSource(BuildConfig.PLEX_URL);
         streaming = new StreamingSource(this, BuildConfig.STREAMING_API_KEY, BuildConfig.COUNTRY);
         myServices = Catalog.csv(BuildConfig.MY_SERVICES);
+        index = new TitleIndex(this, BuildConfig.TMDB_TOKEN);
         build();
+        prepareIndex();
         setContentView(root);
         root.getViewTreeObserver().addOnGlobalFocusChangeListener((oldF, newF) -> onFocus(newF));
         input.requestFocus();
@@ -130,7 +141,7 @@ public class SearchActivity extends Activity {
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
             @Override public void afterTextChanged(Editable s) {
                 ui.removeCallbacks(searchSoon);
-                ui.postDelayed(searchSoon, TYPING_PAUSE_MS);
+                ui.postDelayed(searchSoon, index.ready() ? TYPING_PAUSE_MS : TYPING_PAUSE_NO_INDEX_MS);
             }
         });
         input.setOnEditorActionListener((v, actionId, e) -> {
@@ -197,13 +208,23 @@ public class SearchActivity extends Activity {
         }
         final int gen = ++generation;
         status.setText("Searching…");
+        boolean useIndex = index.ready();
+        // Without the local list, or for a submitted full word, also ask the streaming search
+        // (whole words only, one API call) so rarer titles can still be found.
+        boolean streamingSearch = streaming.enabled() && (useIndex
+                ? submitted && q.length() >= MIN_FULL_WORD_FALLBACK
+                : q.length() >= MIN_STREAMING_CHARS);
         Future<List<Catalog.Title>> fromPlex = io.submit(() -> plex.enabled() ? plex.search(q) : new ArrayList<>());
-        Future<List<Catalog.Title>> fromStreaming = io.submit(() ->
-                streaming.enabled() && q.length() >= MIN_STREAMING_CHARS ? streaming.search(q) : new ArrayList<>());
+        Future<List<Catalog.Title>> fromStreaming = io.submit(() -> streamingSearch ? streaming.search(q) : new ArrayList<>());
         new Thread(() -> {
             List<List<Catalog.Title>> sources = new ArrayList<>();
             List<String> problems = new ArrayList<>();
             collect(fromPlex, sources, problems, "Plex");
+            if (useIndex) {
+                List<Catalog.Title> fromIndex = new ArrayList<>();
+                for (TitleIndex.Entry e : index.search(q, MAX_RESULTS)) fromIndex.add(TitleIndex.toTitle(e));
+                sources.add(fromIndex);
+            }
             collect(fromStreaming, sources, problems, "Streaming");
             List<Catalog.Title> ranked = Catalog.rank(Catalog.merge(sources), q, myServices);
             if (ranked.size() > MAX_RESULTS) ranked = new ArrayList<>(ranked.subList(0, MAX_RESULTS));
@@ -227,10 +248,11 @@ public class SearchActivity extends Activity {
 
     private void showResults(List<Catalog.Title> titles, String q) {
         results = titles;
+        badges.clear();
         posters.removeAllViews();
         posterScroll.scrollTo(0, 0);
         status.setText(q.isEmpty() ? "" : titles.size() == 1 ? "1 result" : titles.size() + " results");
-        if (!q.isEmpty() && streaming.enabled() && q.length() < MIN_STREAMING_CHARS) {
+        if (!q.isEmpty() && !index.ready() && streaming.enabled() && q.length() < MIN_STREAMING_CHARS) {
             // Short queries search only the library (free); streaming lookups cost API calls.
             status.setText(titles.size() + " in your library · type " + MIN_STREAMING_CHARS + "+ letters for streaming");
         }
@@ -256,10 +278,10 @@ public class SearchActivity extends Activity {
     }
 
     // ---- Posters -----------------------------------------------------------------------------
-    private View poster(Catalog.Title t, int index) {
+    private View poster(Catalog.Title t, int position) {
         FrameLayout frame = new FrameLayout(this);
         frame.setId(View.generateViewId());
-        frame.setTag(index);
+        frame.setTag(position);
         frame.setFocusable(true);
         frame.setFocusableInTouchMode(true);
         frame.setClipChildren(false);
@@ -286,16 +308,13 @@ public class SearchActivity extends Activity {
         card.addView(art, new FrameLayout.LayoutParams(-1, -1));
         if (t.poster != null) Images.into(art, t.poster);
 
-        Catalog.Option best = t.options.isEmpty() ? null : t.options.get(0);
-        if (best != null) {
-            TextView badge = Ui.text(this, 22, 700, best.tier == Catalog.OWNED ? 0xFF111111 : Color.WHITE);
-            badge.setText(best.tier == Catalog.OWNED ? "Plex" : best.tier <= Catalog.FREE ? best.serviceName : badgeText(best));
-            badge.setBackground(Ui.rounded(best.tier == Catalog.OWNED ? 0xFFE5A00D : 0xCC0B0D12, 14, 0, 0));
-            badge.setPadding(Ui.px(14), Ui.px(8), Ui.px(14), Ui.px(8));
-            FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
-            blp.leftMargin = blp.topMargin = Ui.px(12);
-            card.addView(badge, blp);
-        }
+        TextView badge = Ui.text(this, 22, 700, Color.WHITE);
+        badge.setPadding(Ui.px(14), Ui.px(8), Ui.px(14), Ui.px(8));
+        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
+        blp.leftMargin = blp.topMargin = Ui.px(12);
+        card.addView(badge, blp);
+        badges.put(t, badge);
+        updateBadge(t);
         frame.addView(card, new FrameLayout.LayoutParams(-1, -1));
 
         GradientDrawable ring = Ui.rounded(Color.TRANSPARENT, 18 + RING, Color.WHITE, 5);
@@ -305,14 +324,32 @@ public class SearchActivity extends Activity {
                     .setDuration(220).setInterpolator(new DecelerateInterpolator(2f)).start();
             card.setElevation(Ui.px(has ? 30 : 8));
             v.setZ(has ? 10 : 0);
-            if (has) showDetails(t, v);
+            if (has) {
+                showDetails(t, v);
+                lookUp(t, v);
+                // Also the next one, so moving right shows its details straight away.
+                if (position + 1 < results.size()) lookUp(results.get(position + 1), posters.getChildAt(position + 1));
+            }
         });
         frame.setOnClickListener(v -> {
             Catalog.Option o = t.bestLaunchable();
             if (o != null) open(t, o);
+            else if (!t.availabilityLoaded && t.tmdb != null) Toast.makeText(this, "Still checking where to watch…", Toast.LENGTH_SHORT).show();
             else if (chips.getChildCount() > 0) Toast.makeText(this, "Not on your services: see the options below", Toast.LENGTH_SHORT).show();
         });
         return frame;
+    }
+
+    /** The label on a poster: where the best way to watch it is ("Plex", "Netflix", "Rent"). */
+    private void updateBadge(Catalog.Title t) {
+        TextView badge = badges.get(t);
+        if (badge == null) return;
+        Catalog.Option best = t.options.isEmpty() ? null : t.options.get(0);
+        badge.setVisibility(best == null ? View.GONE : View.VISIBLE);
+        if (best == null) return;
+        badge.setText(best.tier == Catalog.OWNED ? "Plex" : best.tier <= Catalog.FREE ? best.serviceName : badgeText(best));
+        badge.setTextColor(best.tier == Catalog.OWNED ? 0xFF111111 : Color.WHITE);
+        badge.setBackground(Ui.rounded(best.tier == Catalog.OWNED ? 0xFFE5A00D : 0xCC0B0D12, 14, 0, 0));
     }
 
     private static String badgeText(Catalog.Option o) {
@@ -333,6 +370,12 @@ public class SearchActivity extends Activity {
         dOverview.setVisibility(t.overview == null ? View.GONE : View.VISIBLE);
 
         chips.removeAllViews();
+        if (t.options.isEmpty()) {
+            boolean checking = !t.availabilityLoaded && t.tmdb != null && streaming.enabled();
+            TextView note = Ui.text(this, 28, 500, 0x99FFFFFF);
+            note.setText(checking ? "Checking where to watch…" : "Not available to stream here");
+            chips.addView(note, margins(0, 16, 0, 0));
+        }
         boolean first = true;
         int shown = 0;
         for (Catalog.Option o : t.options) {
@@ -374,6 +417,54 @@ public class SearchActivity extends Activity {
                 backdrop.animate().alpha(0.55f).setDuration(400).start();
             });
         }).start();
+    }
+
+    /** Fetches where a title streams (one API call, cached a day), then refreshes its badge and details. */
+    private void lookUp(Catalog.Title t, View posterView) {
+        if (t.availabilityLoaded || t.tmdb == null || !streaming.enabled() || !lookingUp.add(t)) return;
+        io.execute(() -> {
+            Catalog.Title found = null;
+            try {
+                found = streaming.lookup(t.tmdb);
+            } catch (Exception e) {
+                Log.w(TAG, "Lookup failed for " + t.tmdb, e);
+            }
+            Catalog.Title result = found;
+            ui.post(() -> {
+                lookingUp.remove(t);
+                t.availabilityLoaded = true;
+                if (result != null) {
+                    t.options.addAll(result.options);
+                    if (t.overview == null) t.overview = result.overview;
+                    if (t.genres.isEmpty()) t.genres = result.genres;
+                    if (t.runtimeMin == 0) t.runtimeMin = result.runtimeMin;
+                    if (t.backdrop == null) t.backdrop = result.backdrop;
+                    if (t.poster == null) t.poster = result.poster;
+                    Catalog.sortOptions(t, myServices);
+                }
+                updateBadge(t);
+                if (getCurrentFocus() == posterView) showDetails(t, posterView);
+            });
+        });
+    }
+
+    /** Loads the local title list, and rebuilds it in the background when it's missing or a week old. */
+    private void prepareIndex() {
+        if (!index.enabled()) return;
+        new Thread(() -> {
+            index.load();
+            if (!index.stale()) return;
+            boolean first = !index.ready();
+            try {
+                index.rebuild(pct -> ui.post(() -> {
+                    if (first && input.getText().length() == 0) status.setText("Preparing the title list… " + pct + "%");
+                }));
+                ui.post(() -> { if (first && input.getText().length() == 0) status.setText("Title list ready"); });
+            } catch (Exception e) {
+                Log.w(TAG, "Could not build the title list", e);
+                ui.post(() -> { if (first) status.setText("Couldn't get the title list (will retry next time)"); });
+            }
+        }, "title-index").start();
     }
 
     private void open(Catalog.Title t, Catalog.Option o) {

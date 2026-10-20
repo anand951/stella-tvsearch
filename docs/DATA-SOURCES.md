@@ -13,7 +13,7 @@ Before relying on any source, check these four things:
 |---|---|---|
 | **Streaming Availability API** (Movie of the Night) | https://www.movieofthenight.com/about/api · docs https://docs.movieofthenight.com · keys https://developers.movieofthenight.com | **Chosen for the prototype.** 66 countries; deep links; prices; leaving-soon dates; Hindi and Indian services. Also sold via RapidAPI. OpenAPI spec: https://github.com/movieofthenight/streaming-availability-api |
 | Watchmode | https://api.watchmode.com | Free tier; sources with deep links; a good fallback or comparison |
-| TMDB | https://developer.themoviedb.org/docs | Free posters and metadata. "Watch providers" (powered by JustWatch) has no deep links. Commercial use needs approval |
+| TMDB | https://developer.themoviedb.org/docs | **Used for the local title list and posters** (`/discover`, image CDN). Free for personal use; commercial use needs approval. "Watch providers" (powered by JustWatch) has no deep links. Token: `~/.config/tmdb/token` (API Read Access Token, sent as `Authorization: Bearer`) |
 | JustWatch business data | https://www.justwatch.com/us/JustWatch-Streaming-API | Business licence only. No public API |
 | Reelgood | https://reelgood.com | Sells B2B data |
 | Gracenote | https://gracenote.com | Enterprise data used by TV makers. A reference point, not a starting option |

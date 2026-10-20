@@ -34,6 +34,10 @@ Select a result and it opens straight into the right app, on the right title. Re
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the app and the optional caching server fit together |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Prototype → personal use → possible open-source release |
 
+## Rebuilding after a crash
+
+The full step-by-step guide (PC tools, keys, Plex, Shield, NAS) is in the private `shield-home` repo: `RECOVERY.md`.
+
 ## Secrets
 
 API keys never go in this repo. Locally, the Streaming Availability key lives at `~/.config/streaming-api/key` (mode 600). See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#secrets).

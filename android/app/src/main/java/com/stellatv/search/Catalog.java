@@ -37,6 +37,8 @@ final class Catalog {
     static final class Title {
         String title, kind, tmdb, imdb, overview, poster, backdrop;
         int year, runtimeMin;
+        float popularity;
+        boolean availabilityLoaded;   // streaming options looked up (titles from the local list start without)
         List<String> genres = new ArrayList<>();
         List<Option> options = new ArrayList<>();
         int bestTier = 99;
@@ -79,6 +81,8 @@ final class Catalog {
                     existing = t;
                 } else {
                     existing.options.addAll(t.options);
+                    existing.popularity = Math.max(existing.popularity, t.popularity);
+                    existing.availabilityLoaded |= t.availabilityLoaded;
                     if (existing.poster == null) existing.poster = t.poster;
                     if (existing.backdrop == null) existing.backdrop = t.backdrop;
                     if (existing.overview == null) existing.overview = t.overview;
@@ -90,30 +94,39 @@ final class Catalog {
         return merged;
     }
 
-    /** Orders each title's options best-first (one per service and tier), then titles by relevance. */
+    /**
+     * Orders each title's options best-first (one per service and tier), then titles by relevance,
+     * your library first, then popularity. Streaming options arrive later for local-list titles, so
+     * they don't affect title order (posters shouldn't jump around while you look at them).
+     */
     static List<Title> rank(List<Title> titles, String query, Set<String> myServices) {
-        for (Title t : titles) {
-            for (Option o : t.options) o.tier = tier(o, myServices);
-            t.options.sort(Comparator.<Option>comparingInt(o -> o.tier).thenComparingDouble(o -> o.amount));
-            Set<String> seen = new HashSet<>();
-            List<Option> unique = new ArrayList<>();
-            for (Option o : t.options) {
-                // The API lists each quality (SD/HD/4K) separately; keep the best one.
-                if (seen.add(o.service + "|" + o.addonName + "|" + o.tier)) unique.add(o);
-            }
-            t.options = unique;
-            t.bestTier = unique.isEmpty() ? 99 : unique.get(0).tier;
-        }
+        for (Title t : titles) sortOptions(t, myServices);
         String q = norm(query);
+
         // The API also matches foreign and alternative titles, which look random here. Keep titles
         // whose name contains the query, unless that leaves nothing (e.g. a typo).
         List<Title> out = new ArrayList<>();
         for (Title t : titles) if (relevance(t, q) < 3) out.add(t);
         if (out.isEmpty()) out.addAll(titles);
         Collections.sort(out, Comparator.<Title>comparingInt(t -> relevance(t, q))
-                .thenComparingInt(t -> t.bestTier)
+                .thenComparingInt(t -> t.bestTier == OWNED ? 0 : 1)
+                .thenComparingDouble(t -> -t.popularity)
                 .thenComparingInt(t -> -t.year));
         return out;
+    }
+
+    /** Ranks a title's ways to watch, best first, keeping one per service and tier. */
+    static void sortOptions(Title t, Set<String> myServices) {
+        for (Option o : t.options) o.tier = tier(o, myServices);
+        t.options.sort(Comparator.<Option>comparingInt(o -> o.tier).thenComparingDouble(o -> o.amount));
+        Set<String> seen = new HashSet<>();
+        List<Option> unique = new ArrayList<>();
+        for (Option o : t.options) {
+            // The API lists each quality (SD/HD/4K) separately; keep the best one.
+            if (seen.add(o.service + "|" + o.addonName + "|" + o.tier)) unique.add(o);
+        }
+        t.options = unique;
+        t.bestTier = unique.isEmpty() ? 99 : unique.get(0).tier;
     }
 
     private static int relevance(Title t, String q) {

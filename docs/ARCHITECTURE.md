@@ -23,6 +23,15 @@
 
 Design the availability adapter behind an interface from day one, so switching modes is configuration, not a rewrite.
 
+## Search flow (TV app)
+
+1. **As you type** (350 ms pause): search the **local title list** (word prefixes, by popularity) and **Plex** (`/search`) in parallel. Merge by TMDB id. No streaming API calls.
+2. **When a poster is highlighted** (and the next one): look up where it streams, `GET /v4/shows/{tmdbId}`, cached for a day. Its badge and "watch on" buttons then fill in.
+3. **On Search / Enter with a full word (4+ letters):** also run the streaming title search, so titles outside the local list can still be found.
+4. **Weekly:** rebuild the local list from TMDB in the background (see FINDINGS, "Search-as-you-type").
+
+Title order is fixed when results appear: relevance, then your library, then popularity. Availability arriving later doesn't reorder posters.
+
 ## Ranking
 
 1. Owned (in a local library), then
@@ -41,7 +50,8 @@ Collapse duplicates by TMDB ID.
 
 - Search after the user pauses typing (about 600 ms) or presses Search, not on every key.
 - Cache results by `(normalised title, country)` for about 24 hours, and title details by ID.
-- The personal free tier (1,000 calls a month) is about 30 searches a day, which is plenty with caching.
+- The personal free tier (1,000 calls a month) covers this comfortably: typing costs nothing. Each highlighted title costs one call, once a day.
+- TMDB (local list, posters) is free for personal use. **Commercial use of TMDB needs their approval.** Note this for the hosted tier.
 
 ## Secrets
 

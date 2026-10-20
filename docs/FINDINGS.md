@@ -121,3 +121,24 @@ Notes:
 - **Cold start matters:** when the app was already running, some links just brought it to the front. Our app should handle that (for example, a Netflix-specific flow).
 - Profile pickers can't be skipped. That's acceptable at one button press.
 - Netflix and Disney+ block screenshots, so automated tests can't see their screens. Use `dumpsys media_session` to detect playback.
+
+## Search-as-you-type (October 2026)
+
+Typing on a TV remote means short, partial words ("hun", "pred"). Neither online search handles them:
+
+| Source | "hun" | "hunte" | "hunted" / "hunge" |
+|---|---|---|---|
+| Streaming Availability `/shows/search/title` | Junk (whole-word, fuzzy: "She Walks in Darkness", "Murder, She Wrote") | "Hunt", "Hunter" titles | ✅ *The Hunted* |
+| TMDB `/search/multi` | 10,000 hits led by exact word "Hun" ("Attila the Hun") | — | ✅ *The Hunger Games* |
+
+The streaming search also matches **foreign and alternative titles** ("La preda", "The Hunted"), which look random when only the English title is shown.
+
+**What works:** a **local title list** on the TV, searched by word prefix and ordered by popularity:
+- Built from TMDB `/discover` (English titles, posters, years):
+  - movies by popularity and by vote count (500 pages each; TMDB's maximum page is 500)
+  - TV shows by popularity (500 pages)
+  - Hindi films (`with_original_language=hi`, 200 pages)
+- ~1,700 requests, about a minute, ~25,000 titles, ~2 MB.
+- TMDB's daily ID export files (`files.tmdb.org/p/exports/`, 28 MB of movies) were rejected: they only carry the **original-language** title (e.g. "プライド").
+- **Where to watch** comes from `GET /v4/shows/{movie|tv}/{tmdbId}?country=us` (one call per title, cached for a day), fetched only when a poster is highlighted.
+- A device that sleeps mid-download loses its network. Per-page retries plus "rebuild next time if over 5% failed" handle this.
