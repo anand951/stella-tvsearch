@@ -52,5 +52,5 @@ Gotcha: when the prototype runs on the Plex server itself, `127.0.0.1` is **not*
 ## Known gaps
 
 - Plex TV shows open on the show page (tested). There's no episode picking yet.
-- Prime Video, Peacock, Tubi and others have no launch rule yet, so they show without ▶.
+- Peacock, Tubi, Pluto TV and others have no launch rule yet, so they show without ▶.
 - Disney+ add-on via Hulu opens in Hulu's link format; untested.

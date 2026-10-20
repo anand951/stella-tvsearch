@@ -15,6 +15,7 @@ Test device: **NVIDIA SHIELD TV** (Android TV 11) running a custom launcher, wit
 | Hulu direct link | ✅ | Opens the right title page after the profile picker |
 | HBO Max direct link (`videoLink`) | ✅ | Plays immediately, no profile picker |
 | Paramount+ link (`link`) | ✅ | Profile picker → plays the right movie |
+| Prime Video link (`videoLink`, `&action=play`) | ✅ | Profile picker → plays |
 | Netflix direct link (`/watch/<id>`) | ✅ | **Plays**, but only when launched the "partner way" (see below). A plain VIEW intent stops at the profile picker |
 
 ## Google universal search
@@ -92,6 +93,7 @@ Each app registered web-URL intent filters for its own domain:
 | Hulu | `com.hulu.livingroomplus` | `https://www.hulu.com/watch/<id>` | ✅ Profile picker → title page (no Play button when the title isn't in the plan) |
 | HBO Max | `com.wbd.stream` | `https://play.hbomax.com/video/watch/<id>` (the API's `videoLink`; `play.max.com` also registered) | ✅ **Plays** straight away, no profile picker |
 | Paramount+ | `com.cbs.ott` | `https://www.paramountplus.com/movies/video/<id>/` (the API's `link`; no `videoLink` given) | ✅ Profile picker → **plays** the requested movie |
+| Prime Video | `com.amazon.amazonvideo.livingroom` | `https://app.primevideo.com/detail?gti=<id>&action=play` (the API's `videoLink`) | ✅ Profile picker → **plays** |
 | Netflix | `com.netflix.ninja` | `http://www.netflix.com/watch/<id>` with explicit component, flags and `source` extra (below) | ✅ **Plays** (profile picker skipped on a repeat launch) |
 
 ### Netflix needs the "partner" launch

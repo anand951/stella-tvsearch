@@ -10,6 +10,7 @@ PACKAGES = {
     "disney": "com.disney.disneyplus",
     "hulu": "com.hulu.livingroomplus",
     "plex": "com.plexapp.android",
+    "prime": "com.amazon.amazonvideo.livingroom",
 }
 
 
