@@ -2,6 +2,7 @@ package com.stellatv.search;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -68,6 +69,7 @@ public class SearchActivity extends Activity {
     private EditText input;
     private TextView status, hint, dTitle, dMeta, dOverview;
     private LinearLayout posters, chips, details;
+    private WhereToWatch whereToWatch;
     private HorizontalScrollView posterScroll;
     private MascotView mascot;
     private View mascotTarget;
@@ -170,21 +172,32 @@ public class SearchActivity extends Activity {
         details.setOrientation(LinearLayout.VERTICAL);
         details.setClipChildren(false);
         details.setVisibility(View.INVISIBLE);
-        root.addView(details, at(112, 700, 1700, 360));
-        dTitle = Ui.text(this, 60, 800, Color.WHITE);
+        root.addView(details, at(112, 690, 1808, 390));
+        dTitle = Ui.text(this, 56, 800, Color.WHITE);
         dTitle.setEllipsize(TextUtils.TruncateAt.END);
         details.addView(dTitle);
         dMeta = Ui.text(this, 28, 500, 0xBFFFFFFF);
-        details.addView(dMeta, margins(0, 14, 0, 0));
+        details.addView(dMeta, margins(0, 10, 0, 0));
         dOverview = Ui.text(this, 28, 400, 0xBFFFFFFF);
         dOverview.setSingleLine(false);
         dOverview.setMaxLines(2);
         dOverview.setEllipsize(TextUtils.TruncateAt.END);
         dOverview.setLineSpacing(0, 1.25f);
-        details.addView(dOverview, margins(0, 14, 0, 0));
+        details.addView(dOverview, margins(0, 10, 0, 0));
+        // Where to watch: one shelf of logos, scrolling sideways when a title is on many services.
+        HorizontalScrollView shelf = new HorizontalScrollView(this);
+        shelf.setHorizontalScrollBarEnabled(false);
+        shelf.setClipChildren(false);
+        shelf.setClipToPadding(false);
+        shelf.setOnScrollChangeListener((v, x, y, ox, oy) -> placeMascot(false));
         chips = new LinearLayout(this);
         chips.setClipChildren(false);
-        details.addView(chips, margins(0, 30, 0, 0));
+        chips.setPadding(Ui.px(4), 0, Ui.px(112), 0);
+        shelf.addView(chips);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, -2);
+        slp.setMargins(Ui.px(-4), Ui.px(14), 0, 0);
+        details.addView(shelf, slp);
+        whereToWatch = new WhereToWatch(this);
 
         hint = Ui.text(this, 34, 500, 0x99FFFFFF);
         hint.setGravity(Gravity.CENTER);
@@ -335,7 +348,7 @@ public class SearchActivity extends Activity {
             Catalog.Option o = t.bestLaunchable();
             if (o != null) open(t, o);
             else if (!t.availabilityLoaded && t.tmdb != null) Toast.makeText(this, "Still checking where to watch…", Toast.LENGTH_SHORT).show();
-            else if (chips.getChildCount() > 0) Toast.makeText(this, "Not on your services: see the options below", Toast.LENGTH_SHORT).show();
+            else if (!t.options.isEmpty()) Toast.makeText(this, "Not included in your plans: see where to rent or buy below", Toast.LENGTH_SHORT).show();
         });
         return frame;
     }
@@ -369,38 +382,15 @@ public class SearchActivity extends Activity {
         dOverview.setText(t.overview == null ? "" : t.overview);
         dOverview.setVisibility(t.overview == null ? View.GONE : View.VISIBLE);
 
-        chips.removeAllViews();
         if (t.options.isEmpty()) {
+            chips.removeAllViews();
             boolean checking = !t.availabilityLoaded && t.tmdb != null && streaming.enabled();
             TextView note = Ui.text(this, 28, 500, 0x99FFFFFF);
             note.setText(checking ? "Checking where to watch…" : "Not available to stream here");
-            chips.addView(note, margins(0, 16, 0, 0));
-        }
-        boolean first = true;
-        int shown = 0;
-        for (Catalog.Option o : t.options) {
-            if (shown++ == 6) break;
-            boolean can = Opener.canOpen(o);
-            TextView chip = Ui.text(this, 28, 700, Color.WHITE);
-            String q = o.quality == null ? "" : "  " + o.quality.toUpperCase();
-            chip.setText((can && first ? "▶  " : "") + o.label() + q);
-            chip.setPadding(Ui.px(28), Ui.px(16), Ui.px(28), Ui.px(16));
-            GradientDrawable idle = Ui.rounded(can ? 0x24FFFFFF : 0x0FFFFFFF, 40, 0, 0);
-            GradientDrawable focused = Ui.rounded(o.tier == Catalog.OWNED ? 0xFFE5A00D : Color.WHITE, 40, 0, 0);
-            chip.setBackground(idle);
-            chip.setAlpha(can ? 1f : 0.5f);
-            if (can) {
-                first = false;
-                chip.setFocusable(true);
-                chip.setFocusableInTouchMode(true);
-                chip.setNextFocusUpId(posterView.getId());
-                chip.setOnFocusChangeListener((v, has) -> {
-                    v.setBackground(has ? focused : idle);
-                    ((TextView) v).setTextColor(has ? 0xFF111111 : Color.WHITE);
-                });
-                chip.setOnClickListener(v -> open(t, o));
-            }
-            chips.addView(chip, margins(0, 0, 18, 0));
+            chips.addView(note, margins(4, 16, 0, 0));
+        } else {
+            View best = whereToWatch.fill(chips, t, posterView.getId(), o -> open(t, o));
+            if (best != null) posterView.setNextFocusDownId(withId(best));
         }
         setBackdrop(t.backdrop);
     }
@@ -453,6 +443,8 @@ public class SearchActivity extends Activity {
         if (!index.enabled()) return;
         new Thread(() -> {
             index.load();
+            // Anything typed while the list was loading only searched Plex: search again.
+            if (index.ready()) ui.post(() -> { if (input.getText().length() > 0) search(false); });
             if (!index.stale()) return;
             boolean first = !index.ready();
             try {
@@ -468,8 +460,13 @@ public class SearchActivity extends Activity {
     }
 
     private void open(Catalog.Title t, Catalog.Option o) {
+        Intent intent = Opener.intent(o);
+        if (intent == null) {
+            Toast.makeText(this, o.serviceName + " can't be opened from here yet. Its app isn't on this TV.", Toast.LENGTH_LONG).show();
+            return;
+        }
         try {
-            startActivity(Opener.intent(o));
+            startActivity(intent);
         } catch (Exception e) {
             Log.w(TAG, "Could not open " + o.service, e);
             Toast.makeText(this, "Couldn't open " + o.serviceName + ". Is the app installed?", Toast.LENGTH_LONG).show();
@@ -479,6 +476,12 @@ public class SearchActivity extends Activity {
     // ---- Stella ----------------------------------------------------------------------------
     private void onFocus(View v) {
         if (v == null || v == input || v.getParent() == null) {
+            mascotTarget = null;
+            mascot.setVisibility(View.INVISIBLE);
+            return;
+        }
+        if (v.getTag() instanceof Catalog.Option) {
+            // No room above the where-to-watch logos without covering the description.
             mascotTarget = null;
             mascot.setVisibility(View.INVISIBLE);
             return;
@@ -557,6 +560,11 @@ public class SearchActivity extends Activity {
         lp.leftMargin = Ui.px(x);
         lp.topMargin = Ui.px(y);
         return lp;
+    }
+
+    private static int withId(View v) {
+        if (v.getId() == View.NO_ID) v.setId(View.generateViewId());
+        return v.getId();
     }
 
     private static LinearLayout.LayoutParams margins(float l, float t, float r, float b) {

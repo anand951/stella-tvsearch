@@ -91,9 +91,16 @@ final class StreamingSource {
         for (int i = 0; opts != null && i < opts.length(); i++) {
             JSONObject o = opts.optJSONObject(i);
             Catalog.Option op = new Catalog.Option();
-            op.service = o.optJSONObject("service").optString("id");
-            op.serviceName = o.optJSONObject("service").optString("name");
+            JSONObject service = o.optJSONObject("service");
+            op.service = service.optString("id");
+            op.serviceName = service.optString("name");
+            try {
+                op.color = android.graphics.Color.parseColor(service.optString("themeColorCode", "#2A3344"));
+            } catch (IllegalArgumentException e) {
+                op.color = 0xFF2A3344;
+            }
             JSONObject addon = o.optJSONObject("addon");
+            op.addonId = addon == null ? null : addon.optString("id", null);
             op.addonName = addon == null ? null : addon.optString("name");
             op.type = o.optString("type");
             JSONObject price = o.optJSONObject("price");

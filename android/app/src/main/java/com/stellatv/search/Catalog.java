@@ -17,7 +17,8 @@ final class Catalog {
     static final int OWNED = 0, MY_SERVICE = 1, FREE = 2, ADDON = 3, RENT = 4, BUY = 5, OTHER_SUBSCRIPTION = 6;
 
     static final class Option {
-        String service, serviceName, addonName, type, price, quality, link, videoLink, plexLink;
+        String service, serviceName, addonId, addonName, type, price, quality, link, videoLink, plexLink;
+        int color;   // the service's brand colour, for a logo tile when its app isn't installed
         double amount;
         int tier;
 
@@ -54,7 +55,8 @@ final class Catalog {
             case "owned": return OWNED;
             case "subscription": return myServices.contains(o.service) ? MY_SERVICE : OTHER_SUBSCRIPTION;
             case "free": return FREE;
-            case "addon": return ADDON;
+            // e.g. Hulu inside Disney+: if you already pay for Hulu, it's included.
+            case "addon": return o.addonId != null && myServices.contains(o.addonId) ? MY_SERVICE : ADDON;
             case "rent": return RENT;
             default: return BUY;
         }
@@ -118,12 +120,15 @@ final class Catalog {
     /** Ranks a title's ways to watch, best first, keeping one per service and tier. */
     static void sortOptions(Title t, Set<String> myServices) {
         for (Option o : t.options) o.tier = tier(o, myServices);
-        t.options.sort(Comparator.<Option>comparingInt(o -> o.tier).thenComparingDouble(o -> o.amount));
+        t.options.sort(Comparator.<Option>comparingInt(o -> o.tier).thenComparingDouble(o -> o.amount)
+                .thenComparingInt(o -> o.addonId == null ? 0 : 1));   // the service's own app before an add-on
         Set<String> seen = new HashSet<>();
         List<Option> unique = new ArrayList<>();
         for (Option o : t.options) {
-            // The API lists each quality (SD/HD/4K) separately; keep the best one.
-            if (seen.add(o.service + "|" + o.addonName + "|" + o.tier)) unique.add(o);
+            // The API lists each quality (SD/HD/4K) separately; keep the best one. An included add-on
+            // (Hulu in Disney+) counts as the service it adds, so it isn't shown twice.
+            String what = o.tier == MY_SERVICE && o.addonId != null ? o.addonId : o.addonName == null ? o.service : o.service + "|" + o.addonName;
+            if (seen.add(what + "|" + o.tier)) unique.add(o);
         }
         t.options = unique;
         t.bestTier = unique.isEmpty() ? 99 : unique.get(0).tier;
