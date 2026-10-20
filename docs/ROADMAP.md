@@ -13,7 +13,7 @@
 - Netflix: ✅ solved with the partner-style launch (see FINDINGS).
 - Plex: ✅ solved: an app-route link opens the item page, then one OK press plays (see FINDINGS). Still to check: TV episodes.
 
-## 3. TV app (personal)
+## 3. TV app (personal) 🚧 first version running (October 2026, see android/)
 - Android TV search screen in the same modern style as the custom launcher, with the Stella mascot as the focus indicator.
 - Settings: country, my services, API key, library servers.
 - Search tile on the custom launcher.

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <!-- The apps we open titles in (Android 11+ package visibility). -->
+    <queries>
+        <package android:name="com.plexapp.android" />
+        <package android:name="com.netflix.ninja" />
+        <package android:name="com.wbd.stream" />
+        <package android:name="com.cbs.ott" />
+        <package android:name="com.disney.disneyplus" />
+        <package android:name="com.hulu.livingroomplus" />
+        <package android:name="com.amazon.amazonvideo.livingroom" />
+    </queries>
+
+    <application
+        android:label="Search"
+        android:banner="@drawable/banner"
+        android:icon="@drawable/banner"
+        android:theme="@style/SearchTheme"
+        android:usesCleartextTraffic="true"
+        android:allowBackup="false">
+
+        <activity
+            android:name=".SearchActivity"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:windowSoftInputMode="adjustNothing|stateAlwaysVisible"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -1,0 +1,52 @@
+import groovy.json.JsonSlurper
+
+plugins {
+    id 'com.android.application'
+}
+
+// Personal settings come from the developer's machine, never from the repo:
+//   ~/.config/stella-tv/config.json  (country, my_services, plex.url)
+//   the API key file it points to    (Streaming Availability API key)
+def home = System.getProperty('user.home')
+def cfgFile = new File(home, '.config/stella-tv/config.json')
+def cfg = cfgFile.exists() ? new JsonSlurper().parse(cfgFile) : [:]
+def keyPath = (cfg.api_key_file ?: "${home}/.config/streaming-api/key").replaceFirst('^~', home)
+def keyFile = new File(keyPath)
+def apiKey = keyFile.exists() ? keyFile.text.trim() : ''
+def q = { s -> '"' + (s ?: '').toString().replace('\\', '\\\\').replace('"', '\\"') + '"' }
+
+android {
+    namespace 'com.stellatv.search'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.stellatv.search'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '0.1'
+        buildConfigField 'String', 'STREAMING_API_KEY', q(apiKey)
+        buildConfigField 'String', 'COUNTRY', q(cfg.country ?: 'us')
+        buildConfigField 'String', 'MY_SERVICES', q((cfg.my_services ?: []).join(','))
+        buildConfigField 'String', 'PLEX_URL', q(cfg.plex?.url)
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            // Personal build, sideloaded over ADB only: sign with the debug key.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
