@@ -1,0 +1,6 @@
+{
+  "country": "us",
+  "my_services": ["netflix", "hbo", "paramount", "hulu", "disney"],
+  "plex": {"url": "http://<plex-server-lan-ip>:32400"},
+  "tv": "<tv-ip>:5555"
+}
