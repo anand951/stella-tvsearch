@@ -105,7 +105,11 @@ final class Catalog {
             t.bestTier = unique.isEmpty() ? 99 : unique.get(0).tier;
         }
         String q = norm(query);
-        List<Title> out = new ArrayList<>(titles);
+        // The API also matches foreign and alternative titles, which look random here. Keep titles
+        // whose name contains the query, unless that leaves nothing (e.g. a typo).
+        List<Title> out = new ArrayList<>();
+        for (Title t : titles) if (relevance(t, q) < 3) out.add(t);
+        if (out.isEmpty()) out.addAll(titles);
         Collections.sort(out, Comparator.<Title>comparingInt(t -> relevance(t, q))
                 .thenComparingInt(t -> t.bestTier)
                 .thenComparingInt(t -> -t.year));

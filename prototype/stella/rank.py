@@ -68,4 +68,8 @@ def rank(titles, query, my_services):
         name = _norm(t["title"])
         return 0 if name == q else 1 if name.startswith(q) else 2 if q in name else 3
 
+    # The API also matches foreign and alternative titles, which look random. Keep titles whose
+    # name contains the query, unless that leaves nothing (e.g. a typo).
+    matching = [t for t in titles if relevance(t) < 3]
+    titles = matching or titles
     return sorted(titles, key=lambda t: (relevance(t), t["best_tier"], -(t.get("year") or 0)))
