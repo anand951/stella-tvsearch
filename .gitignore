@@ -1,0 +1,22 @@
+# Secrets: never commit
+*.key
+.env
+.env.*
+secrets/
+local.properties
+*.keystore
+*.jks
+
+# Build output
+build/
+.gradle/
+out/
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
