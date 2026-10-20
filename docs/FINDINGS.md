@@ -9,7 +9,7 @@ Test device: **NVIDIA SHIELD TV** (Android TV 11) running a custom launcher, wit
 | Google universal search (Assistant / "katniss") | ❌ | Finds titles, but selecting a result fails without the stock launcher |
 | JustWatch TV app search | ✅ by hand | Good results, but no deep links into the app and no knowledge of your own library |
 | Plex server search API | ✅ | `/search?query=` returns full metadata, including file paths and TMDB-style GUIDs |
-| Deep link into the Plex app for one library item | ❌ | Every format tried failed (see below) |
+| Deep link into the Plex app for one library item | ✅ | `plex://libraries/<machineId>/movie/<slug>/<ratingKey>` opens the item page with **Watch** focused; one OK press plays at full quality |
 | Streaming Availability API search | ✅ | Accurate, includes prices and direct links |
 | Disney+ direct link | ✅ | Plays the video after the profile picker |
 | Hulu direct link | ✅ | Opens the right title page after the profile picker |
@@ -38,21 +38,37 @@ Test device: **NVIDIA SHIELD TV** (Android TV 11) running a custom launcher, wit
 - `GET http://<server>:32400/search?query=predator` (JSON with `Accept: application/json`) returns movies with `ratingKey`, `title`, `year`, `summary`, `thumb`/`art`, `duration`, the media file path, and `guid` (`plex://movie/...`), which maps to TMDB/IMDb.
 - Auth: either an `X-Plex-Token`, or the server's **"List of IP addresses and networks that are allowed without auth"** setting for the TV's IP. The second keeps tokens off the device.
 
-### Deep-linking into the Plex Android TV app (fails)
+### Deep-linking into the Plex Android TV app (works, one press)
 
-The current Plex app (React Native based) was tested with:
+**Working link** (Plex for Android TV 2026.20, tested on the TV):
+
+```
+am start -a android.intent.action.VIEW \
+  -d "plex://libraries/<machineId>/movie/<slug>/<ratingKey>" com.plexapp.android
+```
+
+- `<machineId>` is the server's `machineIdentifier` (from `GET /identity`). `<ratingKey>` comes from `/search`.
+- It opens the library item page (resolution, audio track and subtitle shown) with **Watch** focused. One OK press plays it in Plex's own player, so quality, audio passthrough, resume and watched status all behave normally.
+- `<slug>` was the lowercase title (`predator`). It's not yet checked whether the slug matters.
+- No autoplay parameter was found in the app.
+- Other app routes found in the bundle, not yet tested:
+  - `libraries/:serverId/show/:slug/:showKey/s/:seasonId/:seasonKey?/e/:episodeId/:episodeKey`: likely the episode page. TV shows still need a test.
+  - `libraries/:serverId/collection/:key`
+  - `libraries/:serverId/playlist/:keyName`
+- How it was found: the app is React Native. `strings` on `assets/index.android.bundle` in the APK shows the route table. The app accepts the prefixes `plex://`, `https://watch.plex.tv` and `https://watch.plextv.dev`.
+
+**Links that failed earlier:**
 
 | Link | Result |
 |---|---|
 | `plex://server://<machineId>/com.plexapp.plugins.library/library/metadata/<ratingKey>` | Ignored (opens Plex home) |
 | `plex://preplay/?metadataKey=/library/metadata/<id>&metadataType=1&server=<machineId>` | Ignored |
-| `plex://watch/video?uri=server://<machineId>/com.plexapp.plugins.library/library/metadata/<id>` | Starts playback, then **"Playback Error: Item not known when attempting to build decision"** |
-| `https://watch.plex.tv/movie/<slug>` | Opens the Discover page, but with **no Play button** for the library copy |
+| `plex://watch/video?uri=server://<machineId>/com.plexapp.plugins.library/library/metadata/<id>` | Starts, then "Playback Error: Item not known when attempting to build decision" |
+| `https://watch.plex.tv/movie/<slug>` | Discover page with no Play button for the library copy |
 
-**Ideas still to try:**
-1. The **Plex Companion / remote-control API**: tell the Plex client on the TV to `playMedia` (how the phone app's "cast to TV" works).
-2. Play the file in our own player, straight from the server (direct play). Simple, but loses Plex resume/watched sync unless we report progress back through the API.
-3. Jellyfin and Kodi have documented, open APIs and are likely easier.
+**Remote control (Companion) is not local any more.** The current app opens no Companion HTTP port (32500) and doesn't answer GDM discovery. "Cast to TV" goes through plex.tv PubSub (cloud, needs the account token) and the Vizbee SDK. We don't need it now that the link above works.
+
+**Our own player was rejected:** playing the file directly in our own app would lose Plex's audio passthrough and quality handling. Always hand playback to the Plex app.
 
 ## Streaming Availability API (movieofthenight)
 

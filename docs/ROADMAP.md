@@ -9,9 +9,9 @@
 - Proves matching (TMDB IDs), ranking and caching.
 - Uses about 10 API calls.
 
-## 2. Close the two launch gaps (needs the TV)
+## 2. Close the two launch gaps ✅ (October 2026)
 - Netflix: ✅ solved with the partner-style launch (see FINDINGS).
-- Plex: test the Companion `playMedia` call. If it fails, build a direct-play fallback.
+- Plex: ✅ solved: an app-route link opens the item page, then one OK press plays (see FINDINGS). Still to check: TV episodes.
 
 ## 3. TV app (personal)
 - Android TV search screen in the same modern style as the custom launcher, with the Stella mascot as the focus indicator.
