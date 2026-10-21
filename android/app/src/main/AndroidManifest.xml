@@ -15,6 +15,7 @@
         <package android:name="com.disney.disneyplus" />
         <package android:name="com.hulu.livingroomplus" />
         <package android:name="com.amazon.amazonvideo.livingroom" />
+        <package android:name="com.google.android.youtube.tv" />
         <!-- Only for their logos -->
         <package android:name="com.tubitv" />
         <package android:name="tv.pluto.android" />

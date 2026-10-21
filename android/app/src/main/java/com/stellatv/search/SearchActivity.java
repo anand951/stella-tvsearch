@@ -60,6 +60,7 @@ public class SearchActivity extends Activity {
     private final ExecutorService io = Executors.newFixedThreadPool(2);
     private PlexSource plex;
     private StreamingSource streaming;
+    private YouTubeSource youtube;
     private TitleIndex index;
     private final Set<Catalog.Title> lookingUp = new HashSet<>();
     private final Map<Catalog.Title, TextView> badges = new HashMap<>();
@@ -92,6 +93,7 @@ public class SearchActivity extends Activity {
         streaming = new StreamingSource(this, BuildConfig.STREAMING_API_KEY, BuildConfig.COUNTRY);
         myServices = Catalog.csv(BuildConfig.MY_SERVICES);
         index = new TitleIndex(this, BuildConfig.TMDB_TOKEN);
+        youtube = new YouTubeSource(this, BuildConfig.TMDB_TOKEN, BuildConfig.COUNTRY);
         build();
         prepareIndex();
         setContentView(root);
@@ -428,18 +430,32 @@ public class SearchActivity extends Activity {
 
     /** Fetches where a title streams (one API call, cached a day), then refreshes its badge and details. */
     private void lookUp(Catalog.Title t, View posterView) {
-        if (t.availabilityLoaded || t.tmdb == null || !streaming.enabled() || !lookingUp.add(t)) return;
+        boolean needStreaming = !t.availabilityLoaded && streaming.enabled();
+        boolean needYouTube = !t.youtubeChecked && youtube.enabled();
+        if (t.tmdb == null || !(needStreaming || needYouTube) || !lookingUp.add(t)) return;
         io.execute(() -> {
             Catalog.Title found = null;
+            Catalog.Option onYouTube = null;
             try {
-                found = streaming.lookup(t.tmdb);
+                if (needStreaming) found = streaming.lookup(t.tmdb);
             } catch (Exception e) {
                 Log.w(TAG, "Lookup failed for " + t.tmdb, e);
             }
+            try {
+                if (needYouTube) onYouTube = youtube.freeOption(t);
+            } catch (Exception e) {
+                Log.w(TAG, "YouTube check failed for " + t.tmdb, e);
+            }
             Catalog.Title result = found;
+            Catalog.Option yt = onYouTube;
             ui.post(() -> {
                 lookingUp.remove(t);
                 t.availabilityLoaded = true;
+                t.youtubeChecked = true;
+                if (yt != null) {
+                    t.options.add(yt);
+                    Catalog.sortOptions(t, myServices);
+                }
                 if (result != null) {
                     t.options.addAll(result.options);
                     if (t.overview == null) t.overview = result.overview;

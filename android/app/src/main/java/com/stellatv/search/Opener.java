@@ -17,6 +17,7 @@ final class Opener {
         PACKAGES.put("disney", "com.disney.disneyplus");
         PACKAGES.put("hulu", "com.hulu.livingroomplus");
         PACKAGES.put("prime", "com.amazon.amazonvideo.livingroom");
+        PACKAGES.put("youtube", "com.google.android.youtube.tv");   // opens a search for the movie
     }
 
     static boolean canOpen(Catalog.Option o) {

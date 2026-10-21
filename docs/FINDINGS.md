@@ -142,3 +142,12 @@ The streaming search also matches **foreign and alternative titles** ("La preda"
 - TMDB's daily ID export files (`files.tmdb.org/p/exports/`, 28 MB of movies) were rejected: they only carry the **original-language** title (e.g. "プライド").
 - **Where to watch** comes from `GET /v4/shows/{movie|tv}/{tmdbId}?country=us` (one call per title, cached for a day), fetched only when a poster is highlighted.
 - A device that sleeps mid-download loses its network. Per-page retries plus "rebuild next time if over 5% failed" handle this.
+
+## YouTube free movies (2026-10-20)
+
+- The Streaming Availability API does not cover YouTube. TMDB's watch providers (JustWatch data) do:
+  provider 235 "YouTube Free" (and 192 "YouTube") under `free`/`ads` for the region. About 10,000 US movies.
+- TMDB doesn't give the video id. The YouTube TV app (`com.google.android.youtube.tv`) accepts
+  `https://www.youtube.com/results?search_query=...` as a VIEW intent and opens its search screen.
+- Tested with "The Terminator 1984 full movie": the official free copy (tagged Free, 1:47:25) was the
+  first result and already selected, so OK plays it. Movies only for now.

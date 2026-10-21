@@ -43,6 +43,7 @@ final class WhereToWatch {
         APPS.put("pluto", "tv.pluto.android");
         APPS.put("peacock", "com.peacocktv.peacockandroid");
         APPS.put("apple", "com.apple.atve.androidtv.appletv");
+        APPS.put("youtube", "com.google.android.youtube.tv");
     }
 
     interface OnPick { void pick(Catalog.Option o); }
@@ -160,7 +161,7 @@ final class WhereToWatch {
         switch (o.tier) {
             case Catalog.OWNED: s = "Your library"; break;
             case Catalog.MY_SERVICE: s = "Included in your plan"; break;
-            case Catalog.FREE: s = "With ads"; break;
+            case Catalog.FREE: s = o.service.equals("youtube") ? "With ads. Opens a YouTube search" : "With ads"; break;
             case Catalog.ADDON: s = "Add-on channel on " + o.serviceName; break;
             case Catalog.OTHER_SUBSCRIPTION: s = "Not in your plans"; break;
             default: s = "";

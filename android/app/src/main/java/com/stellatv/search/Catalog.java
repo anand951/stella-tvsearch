@@ -40,6 +40,7 @@ final class Catalog {
         int year, runtimeMin;
         float popularity;
         boolean availabilityLoaded;   // streaming options looked up (titles from the local list start without)
+        boolean youtubeChecked;       // free-on-YouTube looked up
         List<String> genres = new ArrayList<>();
         List<Option> options = new ArrayList<>();
         int bestTier = 99;
@@ -120,7 +121,9 @@ final class Catalog {
     /** Ranks a title's ways to watch, best first, keeping one per service and tier. */
     static void sortOptions(Title t, Set<String> myServices) {
         for (Option o : t.options) o.tier = tier(o, myServices);
-        t.options.sort(Comparator.<Option>comparingInt(o -> o.tier).thenComparingDouble(o -> o.amount)
+        t.options.sort(Comparator.<Option>comparingInt(o -> o.tier)
+                .thenComparingInt(o -> Opener.canOpen(o) ? 0 : 1)   // apps on this TV first
+                .thenComparingDouble(o -> o.amount)
                 .thenComparingInt(o -> o.addonId == null ? 0 : 1));   // the service's own app before an add-on
         Set<String> seen = new HashSet<>();
         List<Option> unique = new ArrayList<>();
