@@ -26,6 +26,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
+import android.widget.ScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -53,7 +54,7 @@ public class SearchActivity extends Activity {
     private static final int MIN_STREAMING_CHARS = 3;
     private static final int MAX_RESULTS = 30;
     private static final int MIN_FULL_WORD_FALLBACK = 4;
-    private static final float POSTER_W = 230, POSTER_H = 345, RING = 11, FOCUS_SCALE = 1.07f;
+    private static final float POSTER_W = 200, POSTER_H = 300, RING = 11, FOCUS_SCALE = 1.07f;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newFixedThreadPool(2);
@@ -69,6 +70,7 @@ public class SearchActivity extends Activity {
     private EditText input;
     private TextView status, hint, dTitle, dMeta, dOverview;
     private LinearLayout posters, chips, details;
+    private View watchPanel, watchFade;
     private WhereToWatch whereToWatch;
     private HorizontalScrollView posterScroll;
     private MascotView mascot;
@@ -118,8 +120,8 @@ public class SearchActivity extends Activity {
 
         // Search bar
         FrameLayout bar = new FrameLayout(this);
-        bar.setBackground(Ui.rounded(0x1AFFFFFF, 48, 0x59FFFFFF, 2));
-        root.addView(bar, at(112, 72, 1000, 96));
+        bar.setBackground(Ui.rounded(0x1AFFFFFF, 40, 0x59FFFFFF, 2));
+        root.addView(bar, at(112, 40, 1000, 80));
         bar.addView(new Glass(this), new FrameLayout.LayoutParams(Ui.px(44), Ui.px(44), Gravity.CENTER_VERTICAL | Gravity.START) {{
             leftMargin = Ui.px(36);
         }});
@@ -128,7 +130,7 @@ public class SearchActivity extends Activity {
         input.setTextColor(Color.WHITE);
         input.setHintTextColor(0x80FFFFFF);
         input.setHint("Search movies and shows");
-        input.setTextSize(TypedValue.COMPLEX_UNIT_PX, Ui.px(42));
+        input.setTextSize(TypedValue.COMPLEX_UNIT_PX, Ui.px(38));
         input.setTypeface(Ui.font(this, 500));
         input.setSingleLine(true);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
@@ -153,7 +155,7 @@ public class SearchActivity extends Activity {
         });
 
         status = Ui.text(this, 26, 500, 0x99FFFFFF);
-        root.addView(status, at(1150, 107, 700, 40));
+        root.addView(status, at(1150, 64, 700, 40));
 
         // Poster row
         posterScroll = new HorizontalScrollView(this);
@@ -165,38 +167,45 @@ public class SearchActivity extends Activity {
         posters.setClipChildren(false);
         posters.setPadding(Ui.px(112 - RING), Ui.px(30), Ui.px(112), Ui.px(30));
         posterScroll.addView(posters);
-        root.addView(posterScroll, at(0, 250, 1920, POSTER_H + 2 * RING + 60));
+        root.addView(posterScroll, at(0, 215, 1920, POSTER_H + 2 * RING + 60));
 
         // Details for the focused title
         details = new LinearLayout(this);
         details.setOrientation(LinearLayout.VERTICAL);
         details.setClipChildren(false);
         details.setVisibility(View.INVISIBLE);
-        root.addView(details, at(112, 690, 1808, 390));
+        root.addView(details, at(112, 616, 760, 464));
         dTitle = Ui.text(this, 56, 800, Color.WHITE);
         dTitle.setEllipsize(TextUtils.TruncateAt.END);
         details.addView(dTitle);
-        dMeta = Ui.text(this, 28, 500, 0xBFFFFFFF);
-        details.addView(dMeta, margins(0, 10, 0, 0));
-        dOverview = Ui.text(this, 28, 400, 0xBFFFFFFF);
+        dMeta = Ui.text(this, 26, 500, 0xBFFFFFFF);
+        details.addView(dMeta, margins(0, 12, 0, 0));
+        dOverview = Ui.text(this, 26, 400, 0xBFFFFFFF);
         dOverview.setSingleLine(false);
-        dOverview.setMaxLines(2);
+        dOverview.setMaxLines(6);
         dOverview.setEllipsize(TextUtils.TruncateAt.END);
-        dOverview.setLineSpacing(0, 1.25f);
-        details.addView(dOverview, margins(0, 10, 0, 0));
-        // Where to watch: one shelf of logos, scrolling sideways when a title is on many services.
-        HorizontalScrollView shelf = new HorizontalScrollView(this);
-        shelf.setHorizontalScrollBarEnabled(false);
-        shelf.setClipChildren(false);
-        shelf.setClipToPadding(false);
-        shelf.setOnScrollChangeListener((v, x, y, ox, oy) -> placeMascot(false));
+        dOverview.setLineSpacing(0, 1.3f);
+        details.addView(dOverview, margins(0, 12, 0, 0));
+
+        // Where to watch: a list on the right that scrolls when a title is on many services.
+        ScrollView panel = new ScrollView(this);
+        panel.setVerticalScrollBarEnabled(false);
+        panel.setVisibility(View.INVISIBLE);
+        panel.setOnScrollChangeListener((v, x, y, ox, oy) -> placeMascot(false));
         chips = new LinearLayout(this);
+        chips.setOrientation(LinearLayout.VERTICAL);
         chips.setClipChildren(false);
-        chips.setPadding(Ui.px(4), 0, Ui.px(112), 0);
-        shelf.addView(chips);
-        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, -2);
-        slp.setMargins(Ui.px(-4), Ui.px(14), 0, 0);
-        details.addView(shelf, slp);
+        chips.setPadding(0, 0, 0, Ui.px(120));   // the last rows can scroll clear of the fade
+        panel.addView(chips, new ScrollView.LayoutParams(-1, -2));
+        FrameLayout clip = new FrameLayout(this);   // root lets things overflow (for Stella); the list must not
+        clip.addView(panel, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(clip, at(1002, 604, 806, 476));
+        watchPanel = panel;
+        watchFade = new View(this);
+        watchFade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0x000B0D12, 0xF20B0D12}));
+        watchFade.setVisibility(View.INVISIBLE);
+        root.addView(watchFade, at(1002, 980, 806, 100));
         whereToWatch = new WhereToWatch(this);
 
         hint = Ui.text(this, 34, 500, 0x99FFFFFF);
@@ -270,7 +279,7 @@ public class SearchActivity extends Activity {
             status.setText(titles.size() + " in your library · type " + MIN_STREAMING_CHARS + "+ letters for streaming");
         }
         if (titles.isEmpty()) {
-            details.setVisibility(View.INVISIBLE);
+            setDetailsVisible(false);
             setBackdrop(null);
             showHint(q.isEmpty() ? "Find anything: your Plex library, Netflix, Prime Video, Hulu, HBO Max and more."
                     : "Nothing found for “" + q + "”");
@@ -371,7 +380,7 @@ public class SearchActivity extends Activity {
 
     // ---- Details + "watch on" buttons --------------------------------------------------------
     private void showDetails(Catalog.Title t, View posterView) {
-        details.setVisibility(View.VISIBLE);
+        setDetailsVisible(true);
         dTitle.setText(t.title);
         List<String> meta = new ArrayList<>();
         if (t.year > 0) meta.add(String.valueOf(t.year));
@@ -387,12 +396,20 @@ public class SearchActivity extends Activity {
             boolean checking = !t.availabilityLoaded && t.tmdb != null && streaming.enabled();
             TextView note = Ui.text(this, 28, 500, 0x99FFFFFF);
             note.setText(checking ? "Checking where to watch…" : "Not available to stream here");
-            chips.addView(note, margins(4, 16, 0, 0));
+            chips.addView(note, margins(8, 8, 0, 0));
         } else {
             View best = whereToWatch.fill(chips, t, posterView.getId(), o -> open(t, o));
+            watchPanel.scrollTo(0, 0);
             if (best != null) posterView.setNextFocusDownId(withId(best));
         }
         setBackdrop(t.backdrop);
+    }
+
+    private void setDetailsVisible(boolean on) {
+        int v = on ? View.VISIBLE : View.INVISIBLE;
+        details.setVisibility(v);
+        watchPanel.setVisibility(v);
+        watchFade.setVisibility(v);
     }
 
     private void setBackdrop(String url) {
@@ -480,11 +497,9 @@ public class SearchActivity extends Activity {
             mascot.setVisibility(View.INVISIBLE);
             return;
         }
-        if (v.getTag() instanceof Catalog.Option) {
-            // No room above the where-to-watch logos without covering the description.
-            mascotTarget = null;
-            mascot.setVisibility(View.INVISIBLE);
-            return;
+        if (v.getTag() instanceof WhereToWatch.Row) {
+            // Keep the chosen row clear of the fade at the bottom, with the row above it in view.
+            ui.post(() -> ((ScrollView) watchPanel).smoothScrollTo(0, Math.max(0, v.getTop() - Ui.px(110))));
         }
         mascotTarget = v;
         mascot.hop();
@@ -497,7 +512,8 @@ public class SearchActivity extends Activity {
         View v = mascotTarget;
         if (v == null || !v.isAttachedToWindow()) return;
         boolean isPoster = v.getParent() == posters;
-        int size = Ui.px(isPoster ? 120 : 76);
+        boolean isRow = v.getTag() instanceof WhereToWatch.Row;
+        int size = Ui.px(isPoster ? 120 : isRow ? 92 : 76);
         int height = Math.round(size * MascotView.GRID_H / MascotView.GRID_W);
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) mascot.getLayoutParams();
         if (lp.width != size) {
@@ -510,6 +526,11 @@ public class SearchActivity extends Activity {
         float edge = isPoster ? r.exactCenterY() - (r.height() / 2f - Ui.px(RING)) * FOCUS_SCALE : r.top;
         float x = r.exactCenterX() - size / 2f;
         float y = edge - size / MascotView.GRID_W * MascotView.PAW_Y;
+        if (isRow) {
+            // No room above a row: she sits just to its left, in the gap beside the description.
+            x = r.left - size - Ui.px(4);
+            y = r.exactCenterY() - height * 0.62f;
+        }
         mascot.setVisibility(View.VISIBLE);
         mascot.animate().cancel();
         if (animate) {
