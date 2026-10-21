@@ -570,6 +570,11 @@ public class SearchActivity extends Activity {
         imm.hideSoftInputFromWindow(input.getWindowToken(), 0);
     }
 
+    @Override protected void onPause() {
+        super.onPause();
+        hideKeyboard();   // otherwise it stays up over whatever opens next, and the home screen slides up for it
+    }
+
     @Override protected void onDestroy() {
         super.onDestroy();
         io.shutdownNow();
