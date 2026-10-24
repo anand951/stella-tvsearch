@@ -64,8 +64,8 @@ final class WhereToWatch {
         this.pm = c.getPackageManager();
     }
 
-    /** Fills {@code list}. Returns the row Down from the poster should land on, or null. */
-    View fill(LinearLayout list, Catalog.Title t, int upId, OnPick onPick) {
+    /** Fills {@code list}. Left from a row goes to {@code leftId}. Returns the best row, or null. */
+    View fill(LinearLayout list, Catalog.Title t, int upId, int leftId, OnPick onPick) {
         list.removeAllViews();
         List<Row> free = new ArrayList<>(), paid = new ArrayList<>(), extras = new ArrayList<>();
         Map<String, Row> purchases = new LinkedHashMap<>();
@@ -98,7 +98,7 @@ final class WhereToWatch {
             list.addView(head, hl);
             for (Row r : rows) {
                 boolean isBest = best == null && Opener.canOpen(r.open);
-                View row = row(r, isBest, onPick);
+                View row = row(r, isBest, leftId, onPick);
                 if (isBest) best = row;
                 if (first == null) {
                     first = row;
@@ -112,7 +112,7 @@ final class WhereToWatch {
         return best;
     }
 
-    private View row(Row r, boolean isBest, OnPick onPick) {
+    private View row(Row r, boolean isBest, int leftId, OnPick onPick) {
         Catalog.Option o = r.open;
         boolean can = Opener.canOpen(o);
         LinearLayout row = new LinearLayout(c);
@@ -122,7 +122,7 @@ final class WhereToWatch {
         row.setFocusable(true);
         row.setFocusableInTouchMode(true);
         row.setId(View.generateViewId());
-        row.setNextFocusLeftId(row.getId());
+        row.setNextFocusLeftId(leftId);
         row.setNextFocusRightId(row.getId());
 
         View logo = logo(o);

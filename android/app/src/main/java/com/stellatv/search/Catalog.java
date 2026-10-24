@@ -41,6 +41,7 @@ final class Catalog {
         float popularity;
         boolean availabilityLoaded;   // streaming options looked up (titles from the local list start without)
         boolean youtubeChecked;       // free-on-YouTube looked up
+        boolean checkPlex;            // from the watchlist: not yet checked against the library
         List<String> genres = new ArrayList<>();
         List<Option> options = new ArrayList<>();
         int bestTier = 99;

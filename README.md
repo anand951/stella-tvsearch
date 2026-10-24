@@ -25,6 +25,8 @@ Type a title once and get one result list:
 
 Select a result and it opens straight into the right app, on the right title. Results are ranked: things you already own first, then your subscriptions, then free services, then rentals.
 
+Found something for later? **Add to watchlist** saves it on the TV itself (no account, no Plex needed). Open Search with nothing typed, or press **Watchlist** beside the search box, to see your saved titles with up-to-date info on where each one is playing.
+
 ## Documents
 
 | Doc | What's in it |

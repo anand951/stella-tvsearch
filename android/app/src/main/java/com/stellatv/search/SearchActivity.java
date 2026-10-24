@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -32,10 +33,13 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -45,7 +49,8 @@ import java.util.concurrent.Future;
 /**
  * One search across the Plex library and the streaming services. Type a title; the poster row
  * shows every match (your library first, then the most popular). Where each title streams is
- * looked up when you highlight it. OK on a poster opens it; Down shows other ways to watch.
+ * looked up when you highlight it. OK on a poster opens it; Down saves it to the watchlist, and
+ * Right from there shows the ways to watch. With nothing typed, the watchlist shows instead.
  */
 public class SearchActivity extends Activity {
     private static final String TAG = "StellaSearch";
@@ -64,13 +69,19 @@ public class SearchActivity extends Activity {
     private TitleIndex index;
     private final Set<Catalog.Title> lookingUp = new HashSet<>();
     private final Map<Catalog.Title, TextView> badges = new HashMap<>();
+    private final Map<Catalog.Title, View> marks = new HashMap<>();
     private Set<String> myServices;
+    private Watchlist watchlist;
+    private boolean showingWatchlist;
+    private Catalog.Title shown;   // the title whose details are showing
 
     private FrameLayout root;
     private ImageView backdrop;
     private EditText input;
-    private TextView status, hint, dTitle, dMeta, dOverview;
-    private LinearLayout posters, chips, details;
+    private TextView status, hint, dTitle, dMeta, dOverview, saveLabel, savedNote, listCount;
+    private LinearLayout posters, chips, details, saveButton, listButton;
+    private Icon saveIcon, listIcon;
+    private View emptyList;
     private View watchPanel, watchFade;
     private WhereToWatch whereToWatch;
     private HorizontalScrollView posterScroll;
@@ -94,10 +105,12 @@ public class SearchActivity extends Activity {
         myServices = Catalog.csv(BuildConfig.MY_SERVICES);
         index = new TitleIndex(this, BuildConfig.TMDB_TOKEN);
         youtube = new YouTubeSource(this, BuildConfig.TMDB_TOKEN, BuildConfig.COUNTRY);
+        watchlist = new Watchlist(this);
         build();
         prepareIndex();
         setContentView(root);
         root.getViewTreeObserver().addOnGlobalFocusChangeListener((oldF, newF) -> onFocus(newF));
+        showWatchlist(false);   // with nothing typed yet, the watchlist fills the screen
         input.requestFocus();
     }
 
@@ -123,7 +136,7 @@ public class SearchActivity extends Activity {
         // Search bar
         FrameLayout bar = new FrameLayout(this);
         bar.setBackground(Ui.rounded(0x1AFFFFFF, 40, 0x59FFFFFF, 2));
-        root.addView(bar, at(112, 40, 1000, 80));
+        root.addView(bar, at(112, 40, 900, 80));
         bar.addView(new Glass(this), new FrameLayout.LayoutParams(Ui.px(44), Ui.px(44), Gravity.CENTER_VERTICAL | Gravity.START) {{
             leftMargin = Ui.px(36);
         }});
@@ -156,8 +169,40 @@ public class SearchActivity extends Activity {
             return true;
         });
 
+        // Watchlist, beside the search bar
+        listButton = new LinearLayout(this);
+        listButton.setId(View.generateViewId());
+        listButton.setGravity(Gravity.CENTER_VERTICAL);
+        listButton.setPadding(Ui.px(28), 0, Ui.px(22), 0);
+        listButton.setFocusable(true);
+        listButton.setFocusableInTouchMode(true);
+        listIcon = new Icon(this);
+        listButton.addView(listIcon, new LinearLayout.LayoutParams(Ui.px(34), Ui.px(34)));
+        TextView listLabel = Ui.text(this, 30, 700, Color.WHITE);
+        listLabel.setText("Watchlist");
+        listButton.addView(listLabel, margins(16, 0, 0, 0));
+        listCount = Ui.text(this, 24, 800, 0xFF0B0D12);
+        listCount.setGravity(Gravity.CENTER);
+        listCount.setMinWidth(Ui.px(42));
+        listCount.setPadding(Ui.px(12), 0, Ui.px(12), 0);
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-2, Ui.px(42));
+        clp.leftMargin = Ui.px(16);
+        listButton.addView(listCount, clp);
+        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(-2, Ui.px(80));
+        blp.leftMargin = Ui.px(1040);
+        blp.topMargin = Ui.px(40);
+        root.addView(listButton, blp);
+        listButton.setOnClickListener(v -> openWatchlist());
+        listButton.setOnFocusChangeListener((v, has) -> {
+            styleListButton();
+            v.animate().scaleX(has ? 1.05f : 1f).scaleY(has ? 1.05f : 1f).setDuration(160).start();
+        });
+        listButton.setNextFocusLeftId(withId(input));
+        input.setNextFocusRightId(listButton.getId());
+
         status = Ui.text(this, 26, 500, 0x99FFFFFF);
-        root.addView(status, at(1150, 64, 700, 40));
+        status.setEllipsize(TextUtils.TruncateAt.END);
+        root.addView(status, at(1450, 64, 420, 40));
 
         // Poster row
         posterScroll = new HorizontalScrollView(this);
@@ -184,10 +229,32 @@ public class SearchActivity extends Activity {
         details.addView(dMeta, margins(0, 12, 0, 0));
         dOverview = Ui.text(this, 26, 400, 0xBFFFFFFF);
         dOverview.setSingleLine(false);
-        dOverview.setMaxLines(6);
+        dOverview.setMaxLines(4);   // leaves room for the watchlist button below
         dOverview.setEllipsize(TextUtils.TruncateAt.END);
         dOverview.setLineSpacing(0, 1.3f);
         details.addView(dOverview, margins(0, 12, 0, 0));
+
+        saveButton = new LinearLayout(this);
+        saveButton.setId(View.generateViewId());
+        saveButton.setGravity(Gravity.CENTER_VERTICAL);
+        saveButton.setPadding(Ui.px(24), 0, Ui.px(30), 0);
+        saveButton.setFocusable(true);
+        saveButton.setFocusableInTouchMode(true);
+        saveButton.setNextFocusDownId(saveButton.getId());
+        saveButton.setNextFocusLeftId(saveButton.getId());
+        saveIcon = new Icon(this);
+        saveButton.addView(saveIcon, new LinearLayout.LayoutParams(Ui.px(30), Ui.px(30)));
+        saveLabel = Ui.text(this, 26, 800, Color.WHITE);
+        saveButton.addView(saveLabel, margins(14, 0, 0, 0));
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-2, Ui.px(64));
+        slp.topMargin = Ui.px(26);
+        details.addView(saveButton, slp);
+        saveButton.setOnClickListener(v -> toggleSaved());
+        saveButton.setOnFocusChangeListener((v, has) -> styleSaveButton());
+        savedNote = Ui.text(this, 22, 500, 0xC7FFFFFF);
+        savedNote.setSingleLine(false);
+        savedNote.setVisibility(View.GONE);
+        details.addView(savedNote, margins(0, 14, 0, 0));
 
         // Where to watch: a list on the right that scrolls when a title is on many services.
         ScrollView panel = new ScrollView(this);
@@ -214,7 +281,11 @@ public class SearchActivity extends Activity {
         hint.setGravity(Gravity.CENTER);
         hint.setSingleLine(false);
         root.addView(hint, at(0, 480, 1920, 120));
-        showHint("Find anything: your Plex library, Netflix, Prime Video, Hulu, HBO Max and more.");
+        hint.setVisibility(View.GONE);
+
+        emptyList = emptyWatchlist();
+        emptyList.setVisibility(View.GONE);
+        root.addView(emptyList, at(112, 250, 1500, 320));
 
         mascot = new MascotView(this);
         mascot.setVisibility(View.INVISIBLE);
@@ -227,7 +298,7 @@ public class SearchActivity extends Activity {
         focusResultsWhenDone = submitted;
         if (q.isEmpty()) {
             generation++;
-            showResults(new ArrayList<>(), q);
+            showWatchlist(submitted);
             return;
         }
         final int gen = ++generation;
@@ -271,34 +342,156 @@ public class SearchActivity extends Activity {
     }
 
     private void showResults(List<Catalog.Title> titles, String q) {
-        results = titles;
-        badges.clear();
-        posters.removeAllViews();
-        posterScroll.scrollTo(0, 0);
-        status.setText(q.isEmpty() ? "" : titles.size() == 1 ? "1 result" : titles.size() + " results");
-        if (!q.isEmpty() && !index.ready() && streaming.enabled() && q.length() < MIN_STREAMING_CHARS) {
+        setWatchlistMode(false);
+        status.setText(titles.size() == 1 ? "1 result" : titles.size() + " results");
+        if (!index.ready() && streaming.enabled() && q.length() < MIN_STREAMING_CHARS) {
             // Short queries search only the library (free); streaming lookups cost API calls.
             status.setText(titles.size() + " in your library · type " + MIN_STREAMING_CHARS + "+ letters for streaming");
         }
+        showPosters(titles);
         if (titles.isEmpty()) {
-            setDetailsVisible(false);
-            setBackdrop(null);
-            showHint(q.isEmpty() ? "Find anything: your Plex library, Netflix, Prime Video, Hulu, HBO Max and more."
-                    : "Nothing found for “" + q + "”");
+            showHint("Nothing found for “" + q + "”");
             return;
         }
         hint.setVisibility(View.GONE);
-        for (int i = 0; i < titles.size(); i++) posters.addView(poster(titles.get(i), i));
-        showDetails(titles.get(0), posters.getChildAt(0));
         if (focusResultsWhenDone) {
             hideKeyboard();
             posters.getChildAt(0).requestFocus();
         }
     }
 
+    private void showPosters(List<Catalog.Title> titles) {
+        results = titles;
+        badges.clear();
+        marks.clear();
+        posters.removeAllViews();
+        posterScroll.scrollTo(0, 0);
+        for (int i = 0; i < titles.size(); i++) posters.addView(poster(titles.get(i), i));
+        if (titles.isEmpty()) {
+            setDetailsVisible(false);
+            setBackdrop(null);
+        } else {
+            showDetails(titles.get(0), posters.getChildAt(0));
+            if (showingWatchlist) lookUp(titles.get(0), posters.getChildAt(0));   // results do this on focus, as you type
+        }
+    }
+
     private void showHint(String text) {
         hint.setText(text);
         hint.setVisibility(View.VISIBLE);
+    }
+
+    // ---- Watchlist ---------------------------------------------------------------------------
+    /** The Watchlist button: shows the saved titles, clearing the search. */
+    private void openWatchlist() {
+        if (input.getText().length() > 0) {
+            input.setText("");
+            ui.removeCallbacks(searchSoon);   // setText schedules a search; this replaces it
+        }
+        showWatchlist(true);
+    }
+
+    private void showWatchlist(boolean focusFirst) {
+        setWatchlistMode(true);
+        List<Catalog.Title> saved = watchlist.titles();
+        status.setText(saved.isEmpty() ? "" : "Newest first");
+        hint.setVisibility(View.GONE);
+        emptyList.setVisibility(saved.isEmpty() ? View.VISIBLE : View.GONE);
+        showPosters(saved);
+        if (focusFirst && !saved.isEmpty()) {
+            hideKeyboard();
+            posters.getChildAt(0).requestFocus();
+        }
+    }
+
+    private void setWatchlistMode(boolean on) {
+        showingWatchlist = on;
+        if (!on) emptyList.setVisibility(View.GONE);
+        styleListButton();
+    }
+
+    private void toggleSaved() {
+        Catalog.Title t = shown;
+        if (t == null) return;
+        if (watchlist.contains(t)) {
+            watchlist.remove(t);
+            savedNote.setText("Removed from your watchlist.");
+        } else {
+            watchlist.add(t);
+            savedNote.setText("Saved. Find it later under Watchlist at the top. Press OK again to remove it.");
+        }
+        savedNote.setVisibility(View.VISIBLE);
+        styleSaveButton();
+        styleListButton();
+        updateMark(t);
+    }
+
+    private void styleSaveButton() {
+        boolean saved = shown != null && watchlist.contains(shown);
+        boolean focused = saveButton.isFocused();
+        int color = saved ? WhereToWatch.NO_COST : Color.WHITE;
+        saveButton.setBackground(Ui.rounded(saved ? (focused ? 0x405FD39B : 0x1F5FD39B) : (focused ? 0x24FFFFFF : 0x14FFFFFF), 32,
+                focused ? Color.WHITE : saved ? WhereToWatch.NO_COST : 0x59FFFFFF, focused ? 4 : 2));
+        saveIcon.set(saved ? Icon.CHECK : Icon.PLUS, color);
+        saveLabel.setText(saved ? "On your watchlist" : "Add to watchlist");
+        saveLabel.setTextColor(color);
+    }
+
+    /** White while the watchlist is showing; the count of saved titles in a pill. */
+    private void styleListButton() {
+        boolean focused = listButton.isFocused();
+        int n = watchlist.size();
+        int ink = showingWatchlist ? 0xFF0B0D12 : Color.WHITE;
+        listButton.setBackground(showingWatchlist ? Ui.rounded(Color.WHITE, 40, 0, 0)
+                : Ui.rounded(focused ? 0x33FFFFFF : 0x1AFFFFFF, 40, focused ? Color.WHITE : 0x59FFFFFF, focused ? 4 : 2));
+        listIcon.set(showingWatchlist ? Icon.BOOKMARK_FILLED : Icon.BOOKMARK, ink);
+        ((TextView) listButton.getChildAt(1)).setTextColor(ink);
+        listCount.setText(String.valueOf(n));
+        listCount.setVisibility(n == 0 ? View.GONE : View.VISIBLE);
+        listCount.setTextColor(showingWatchlist ? Color.WHITE : 0xFF0B0D12);
+        listCount.setBackground(Ui.rounded(showingWatchlist ? 0xFF0B0D12 : Color.WHITE, 21, 0, 0));
+    }
+
+    /** A green bookmark on a search result that's already on the watchlist. */
+    private void updateMark(Catalog.Title t) {
+        View mark = marks.get(t);
+        if (mark != null) mark.setVisibility(!showingWatchlist && watchlist.contains(t) ? View.VISIBLE : View.GONE);
+    }
+
+    private View emptyWatchlist() {
+        FrameLayout box = new FrameLayout(this);
+        box.setClipChildren(false);
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout slot = new FrameLayout(this);
+        GradientDrawable dashed = Ui.rounded(Color.TRANSPARENT, 16, 0, 0);
+        dashed.setStroke(Ui.px(3), 0x4DFFFFFF, Ui.px(14), Ui.px(10));
+        slot.setBackground(dashed);
+        Icon mark = new Icon(this);
+        mark.set(Icon.BOOKMARK, 0x73FFFFFF);
+        slot.addView(mark, new FrameLayout.LayoutParams(Ui.px(64), Ui.px(64), Gravity.CENTER));
+        row.addView(slot, new LinearLayout.LayoutParams(Ui.px(POSTER_W), Ui.px(POSTER_H)));
+        LinearLayout text = new LinearLayout(this);
+        text.setOrientation(LinearLayout.VERTICAL);
+        TextView head = Ui.text(this, 48, 800, Color.WHITE);
+        head.setText("Nothing saved yet");
+        text.addView(head);
+        TextView body = Ui.text(this, 28, 400, 0xC7FFFFFF);
+        body.setSingleLine(false);
+        body.setLineSpacing(0, 1.3f);
+        body.setText("Search for a movie or show, then choose Add to watchlist under its description. "
+                + "It waits here until you're ready to watch, with fresh info on where it's playing.");
+        text.addView(body, margins(0, 16, 0, 0));
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(Ui.px(820), -2);
+        tlp.leftMargin = Ui.px(56);
+        row.addView(text, tlp);
+        box.addView(row, new FrameLayout.LayoutParams(-2, -1));
+        MascotView stella = new MascotView(this);
+        FrameLayout.LayoutParams mlp = new FrameLayout.LayoutParams(Ui.px(150), Math.round(Ui.px(150) * MascotView.GRID_H / MascotView.GRID_W));
+        mlp.leftMargin = Ui.px(1138);
+        mlp.topMargin = Ui.px(50);
+        box.addView(stella, mlp);
+        return box;
     }
 
     // ---- Posters -----------------------------------------------------------------------------
@@ -339,6 +532,15 @@ public class SearchActivity extends Activity {
         card.addView(badge, blp);
         badges.put(t, badge);
         updateBadge(t);
+
+        Icon mark = new Icon(this);
+        mark.set(Icon.BOOKMARK_FILLED, WhereToWatch.NO_COST);
+        FrameLayout.LayoutParams mlp = new FrameLayout.LayoutParams(Ui.px(40), Ui.px(40), Gravity.TOP | Gravity.END);
+        mlp.rightMargin = Ui.px(12);
+        mlp.topMargin = -Ui.px(4);
+        card.addView(mark, mlp);
+        marks.put(t, mark);
+        updateMark(t);
         frame.addView(card, new FrameLayout.LayoutParams(-1, -1));
 
         GradientDrawable ring = Ui.rounded(Color.TRANSPARENT, 18 + RING, Color.WHITE, 5);
@@ -388,23 +590,38 @@ public class SearchActivity extends Activity {
         if (t.year > 0) meta.add(String.valueOf(t.year));
         meta.add(t.kind.equals("movie") ? "Movie" : "Series");
         if (t.runtimeMin > 0 && t.kind.equals("movie")) meta.add(t.runtimeMin / 60 > 0 ? (t.runtimeMin / 60) + "h " + (t.runtimeMin % 60) + "m" : t.runtimeMin + "m");
-        if (!t.genres.isEmpty()) meta.add(TextUtils.join(", ", t.genres));
+        long savedAt = showingWatchlist ? watchlist.savedAt(t) : 0;
+        if (savedAt > 0) meta.add("Saved " + new SimpleDateFormat("MMM d", Locale.getDefault()).format(new Date(savedAt)));
+        else if (!t.genres.isEmpty()) meta.add(TextUtils.join(", ", t.genres));
         dMeta.setText(TextUtils.join("  ·  ", meta));
         dOverview.setText(t.overview == null ? "" : t.overview);
         dOverview.setVisibility(t.overview == null ? View.GONE : View.VISIBLE);
+        if (t != shown) savedNote.setVisibility(View.GONE);
+        shown = t;
+        styleSaveButton();
 
+        // Down from the poster: the watchlist button. Right from there: the ways to watch.
+        posterView.setNextFocusDownId(saveButton.getId());
+        saveButton.setNextFocusUpId(posterView.getId());
+        saveButton.setNextFocusRightId(saveButton.getId());
         if (t.options.isEmpty()) {
             chips.removeAllViews();
-            boolean checking = !t.availabilityLoaded && t.tmdb != null && streaming.enabled();
+            boolean checking = (!t.availabilityLoaded && t.tmdb != null && streaming.enabled()) || t.checkPlex;
             TextView note = Ui.text(this, 28, 500, 0x99FFFFFF);
             note.setText(checking ? "Checking where to watch…" : "Not available to stream here");
             chips.addView(note, margins(8, 8, 0, 0));
         } else {
-            View best = whereToWatch.fill(chips, t, posterView.getId(), o -> open(t, o));
+            View best = whereToWatch.fill(chips, t, posterView.getId(), saveButton.getId(), o -> open(t, o));
             watchPanel.scrollTo(0, 0);
-            if (best != null) posterView.setNextFocusDownId(withId(best));
+            View right = best != null ? best : firstRow();
+            if (right != null) saveButton.setNextFocusRightId(withId(right));
         }
         setBackdrop(t.backdrop);
+    }
+
+    private View firstRow() {
+        for (int i = 0; i < chips.getChildCount(); i++) if (chips.getChildAt(i).isFocusable()) return chips.getChildAt(i);
+        return null;
     }
 
     private void setDetailsVisible(boolean on) {
@@ -430,12 +647,18 @@ public class SearchActivity extends Activity {
 
     /** Fetches where a title streams (one API call, cached a day), then refreshes its badge and details. */
     private void lookUp(Catalog.Title t, View posterView) {
-        boolean needStreaming = !t.availabilityLoaded && streaming.enabled();
-        boolean needYouTube = !t.youtubeChecked && youtube.enabled();
-        if (t.tmdb == null || !(needStreaming || needYouTube) || !lookingUp.add(t)) return;
+        boolean needStreaming = t.tmdb != null && !t.availabilityLoaded && streaming.enabled();
+        boolean needYouTube = t.tmdb != null && !t.youtubeChecked && youtube.enabled();
+        boolean needPlex = t.checkPlex && plex.enabled();
+        if (!(needStreaming || needYouTube || needPlex) || !lookingUp.add(t)) return;
         io.execute(() -> {
-            Catalog.Title found = null;
+            Catalog.Title found = null, inLibrary = null;
             Catalog.Option onYouTube = null;
+            try {
+                if (needPlex) inLibrary = findInPlex(t);
+            } catch (Exception e) {
+                Log.w(TAG, "Plex check failed for " + t.title, e);
+            }
             try {
                 if (needStreaming) found = streaming.lookup(t.tmdb);
             } catch (Exception e) {
@@ -446,12 +669,17 @@ public class SearchActivity extends Activity {
             } catch (Exception e) {
                 Log.w(TAG, "YouTube check failed for " + t.tmdb, e);
             }
-            Catalog.Title result = found;
+            Catalog.Title result = found, library = inLibrary;
             Catalog.Option yt = onYouTube;
             ui.post(() -> {
                 lookingUp.remove(t);
                 t.availabilityLoaded = true;
                 t.youtubeChecked = true;
+                t.checkPlex = false;
+                if (library != null) {
+                    t.options.addAll(library.options);
+                    Catalog.sortOptions(t, myServices);
+                }
                 if (yt != null) {
                     t.options.add(yt);
                     Catalog.sortOptions(t, myServices);
@@ -466,9 +694,20 @@ public class SearchActivity extends Activity {
                     Catalog.sortOptions(t, myServices);
                 }
                 updateBadge(t);
-                if (getCurrentFocus() == posterView) showDetails(t, posterView);
+                // Refresh the details if they're for this title, unless a way to watch is selected
+                // (rebuilding the list would take the selection away).
+                View f = getCurrentFocus();
+                if (f == posterView || (shown == t && !(f != null && f.getTag() instanceof WhereToWatch.Row))) showDetails(t, posterView);
             });
         });
+    }
+
+    /** A saved title in the Plex library now (it may have been added since it was saved). */
+    private Catalog.Title findInPlex(Catalog.Title t) throws Exception {
+        for (Catalog.Title p : plex.search(t.title)) {
+            if (t.tmdb != null ? t.tmdb.equals(p.tmdb) : Catalog.norm(p.title).equals(Catalog.norm(t.title)) && p.year == t.year) return p;
+        }
+        return null;
     }
 
     /** Loads the local title list, and rebuilds it in the background when it's missing or a week old. */
@@ -528,7 +767,7 @@ public class SearchActivity extends Activity {
         View v = mascotTarget;
         if (v == null || !v.isAttachedToWindow()) return;
         boolean isPoster = v.getParent() == posters;
-        boolean isRow = v.getTag() instanceof WhereToWatch.Row;
+        boolean isRow = v.getTag() instanceof WhereToWatch.Row || v == saveButton;
         int size = Ui.px(isPoster ? 120 : isRow ? 92 : 76);
         int height = Math.round(size * MascotView.GRID_H / MascotView.GRID_W);
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) mascot.getLayoutParams();
@@ -545,6 +784,10 @@ public class SearchActivity extends Activity {
         if (isRow) {
             // No room above a row: she sits just to its left, in the gap beside the description.
             x = r.left - size - Ui.px(4);
+            y = r.exactCenterY() - height * 0.62f;
+        } else if (v == listButton) {
+            // Nothing above it but the screen edge: she sits just to its right.
+            x = r.right + Ui.px(8);
             y = r.exactCenterY() - height * 0.62f;
         }
         mascot.setVisibility(View.VISIBLE);
@@ -573,7 +816,7 @@ public class SearchActivity extends Activity {
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
         // From the search bar, Down jumps to the results (when the keyboard isn't using the key).
         if (e.getAction() == KeyEvent.ACTION_DOWN && e.getKeyCode() == KeyEvent.KEYCODE_DPAD_DOWN
-                && getCurrentFocus() == input && posters.getChildCount() > 0) {
+                && (getCurrentFocus() == input || getCurrentFocus() == listButton) && posters.getChildCount() > 0) {
             hideKeyboard();
             posters.getChildAt(0).requestFocus();
             return true;
@@ -613,6 +856,55 @@ public class SearchActivity extends Activity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
         lp.setMargins(Ui.px(l), Ui.px(t), Ui.px(r), Ui.px(b));
         return lp;
+    }
+
+    /** Small line icons: plus, check, and a bookmark (outline or filled). Drawn on a 24-unit grid. */
+    private static final class Icon extends View {
+        static final int PLUS = 0, CHECK = 1, BOOKMARK = 2, BOOKMARK_FILLED = 3;
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path = new Path();
+        private int shape;
+
+        Icon(Context c) {
+            super(c);
+            p.setStrokeCap(Paint.Cap.ROUND);
+            p.setStrokeJoin(Paint.Join.ROUND);
+            p.setColor(Color.WHITE);
+        }
+
+        void set(int shape, int color) {
+            this.shape = shape;
+            p.setColor(color);
+            invalidate();
+        }
+
+        @Override protected void onDraw(Canvas c) {
+            float s = getWidth() / 24f;
+            path.reset();
+            p.setStyle(shape == BOOKMARK_FILLED ? Paint.Style.FILL_AND_STROKE : Paint.Style.STROKE);
+            switch (shape) {
+                case PLUS:
+                    p.setStrokeWidth(2.4f * s);
+                    c.drawLine(12 * s, 5 * s, 12 * s, 19 * s, p);
+                    c.drawLine(5 * s, 12 * s, 19 * s, 12 * s, p);
+                    return;
+                case CHECK:
+                    p.setStrokeWidth(2.6f * s);
+                    path.moveTo(5 * s, 12.5f * s);
+                    path.lineTo(9.5f * s, 17 * s);
+                    path.lineTo(19 * s, 7.5f * s);
+                    break;
+                default:
+                    p.setStrokeWidth(2 * s);
+                    path.moveTo(6.5f * s, 3.5f * s);
+                    path.lineTo(17.5f * s, 3.5f * s);
+                    path.lineTo(17.5f * s, 20.5f * s);
+                    path.lineTo(12 * s, 16.5f * s);
+                    path.lineTo(6.5f * s, 20.5f * s);
+                    path.close();
+            }
+            c.drawPath(path, p);
+        }
     }
 
     /** The magnifying-glass icon in the search bar. */
