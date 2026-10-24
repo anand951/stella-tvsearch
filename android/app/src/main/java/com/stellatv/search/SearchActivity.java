@@ -212,6 +212,7 @@ public class SearchActivity extends Activity {
         posterScroll.setOnScrollChangeListener((v, x, y, ox, oy) -> placeMascot(false));
         posters = new LinearLayout(this);
         posters.setClipChildren(false);
+        posters.setClipToPadding(false);   // the focus ring grows past the padding; don't cut it off
         posters.setPadding(Ui.px(112 - RING), Ui.px(30), Ui.px(112), Ui.px(30));
         posterScroll.addView(posters);
         root.addView(posterScroll, at(0, 215, 1920, POSTER_H + 2 * RING + 60));
