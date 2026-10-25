@@ -36,9 +36,9 @@ Found something for later? **Add to watchlist** saves it on the TV itself (no ac
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the app and the optional caching server fit together |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Prototype → personal use → possible open-source release |
 
-## Rebuilding after a crash
+## Building it
 
-The full step-by-step guide (PC tools, keys, Plex, Shield, NAS) is in the private `shield-home` repo: `RECOVERY.md`.
+See [android/README.md](android/README.md) for the TV app and [prototype/README.md](prototype/README.md) for the command-line prototype.
 
 ## Secrets
 
