@@ -26,7 +26,7 @@ Before relying on any source, check these four things:
 | Jellyfin | https://api.jellyfin.org | Fully open. Likely the easiest "play this item" story |
 | Kodi | https://kodi.wiki/view/JSON-RPC_API | JSON-RPC remote control, including `Player.Open` |
 
-## Watch history and watchlists (possible premium features)
+## Watch history and watchlists (possible future features)
 
 | Source | Link |
 |---|---|

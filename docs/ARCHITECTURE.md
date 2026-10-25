@@ -19,7 +19,7 @@
 ### Two modes, same code
 
 1. **Personal mode (first):** everything runs on the TV. The user brings their own API key. Library adapters talk to the local server on the home network. No server of ours.
-2. **Hosted mode (only if commercial):** availability lookups go through a small caching server we run. One lookup of "Predator" serves every user, which keeps API costs flat as users grow. Library lookups still stay on the user's network, so we never see their library.
+2. **Hosted mode (maybe later):** availability lookups go through a small caching server we run. One lookup of "Predator" serves every user, which keeps API costs flat as users grow. Library lookups still stay on the user's network, so we never see their library.
 
 Design the availability adapter behind an interface from day one, so switching modes is configuration, not a rewrite.
 
@@ -51,7 +51,7 @@ Collapse duplicates by TMDB ID.
 - Search after the user pauses typing (about 600 ms) or presses Search, not on every key.
 - Cache results by `(normalised title, country)` for about 24 hours, and title details by ID.
 - The personal free tier (1,000 calls a month) covers this comfortably: typing costs nothing. Each highlighted title costs one call, once a day.
-- TMDB (local list, posters) is free for personal use. **Commercial use of TMDB needs their approval.** Note this for the hosted tier.
+- TMDB (local list, posters) is free for personal use. **Commercial use of TMDB needs their approval.** Note this for a hosted service.
 
 ## Secrets
 

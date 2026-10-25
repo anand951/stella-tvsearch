@@ -10,6 +10,8 @@ The TV version of the prototype: one search screen across your Plex library and 
 
 ## Build (personal)
 
+First time? Follow [docs/SETUP.md](../docs/SETUP.md), which covers keys, Plex and the TV step by step.
+
 Settings are read **at build time** from the developer's machine, never from the repo:
 
 - `~/.config/stella-tv/config.json`: `country`, `my_services`, `plex.url` (see `prototype/config.example.json`)

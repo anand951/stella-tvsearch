@@ -18,8 +18,9 @@
 - Settings: country, my services, API key, library servers.
 - Search tile on the custom launcher.
 
-## 4. Decide on open source
-- If yes: pick a license, scrub the history of anything personal, write a CONTRIBUTING guide, and publish.
+## 4. Open source 🚧 (October 2026)
+- ✅ Apache-2.0 license, history checked for personal data, setup guide ([SETUP.md](SETUP.md)).
+- Still to do: a CONTRIBUTING guide, then publish.
 
-## 5. Optional hosted tier
+## 5. Maybe later: a hosted service
 - Caching server for availability data, accounts, "leaving soon" alerts, watchlist sync (Trakt), multiple TVs and profiles.
