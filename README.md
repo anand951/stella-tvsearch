@@ -2,9 +2,9 @@
 
 **One search box for everything you can watch**: your own media library (Plex, later Jellyfin and Kodi) and the streaming services you pay for, in one list, with one press to start watching.
 
-> Working name. Stella is the labradoodle mascot from the custom TV home screen this idea grew out of.
+> Stella is the labradoodle mascot who shows you where you are on the screen.
 
-Status: **research and design**. No app code yet. This repo holds what was learned while testing on a real TV, and the plan.
+Status: **working app for Android TV**, in daily use on an NVIDIA SHIELD TV. There's no app store version yet: you build it with your own free API keys. See [docs/SETUP.md](docs/SETUP.md).
 
 ## The problem
 
@@ -31,6 +31,7 @@ Found something for later? **Add to watchlist** saves it on the TV itself (no ac
 
 | Doc | What's in it |
 |---|---|
+| [docs/SETUP.md](docs/SETUP.md) | Set it up on your own TV, step by step |
 | [docs/FINDINGS.md](docs/FINDINGS.md) | What was tested on an NVIDIA SHIELD TV, and what worked |
 | [docs/DATA-SOURCES.md](docs/DATA-SOURCES.md) | APIs for streaming availability, local libraries and watch history |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the app and the optional caching server fit together |
@@ -38,7 +39,7 @@ Found something for later? **Add to watchlist** saves it on the TV itself (no ac
 
 ## Building it
 
-See [android/README.md](android/README.md) for the TV app and [prototype/README.md](prototype/README.md) for the command-line prototype.
+Start with [docs/SETUP.md](docs/SETUP.md). [android/README.md](android/README.md) explains the TV app's code, and [prototype/README.md](prototype/README.md) the command-line prototype it grew from.
 
 ## Secrets
 
@@ -46,4 +47,6 @@ API keys never go in this repo. Locally, the Streaming Availability key lives at
 
 ## License
 
-None yet. That's deliberate while the repo is private and the open-source decision is open. Until a license is added, all rights are reserved.
+Copyright 2026 Anand Sheth. Licensed under the [Apache License, Version 2.0](LICENSE).
+
+The Figtree font in `android/app/src/main/assets` is under the SIL Open Font License ([android/FONT-LICENSE-OFL.txt](android/FONT-LICENSE-OFL.txt)). Streaming data comes from the Streaming Availability API and title data from TMDB, each under its own terms. This product uses the TMDB API but is not endorsed or certified by TMDB.
