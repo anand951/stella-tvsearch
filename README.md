@@ -6,6 +6,10 @@
 
 Status: **working app for Android TV**, in daily use on an NVIDIA SHIELD TV. There's no app store version yet: you build it with your own free API keys. See [docs/SETUP.md](docs/SETUP.md).
 
+**Works on:** NVIDIA SHIELD TV (tested). Google TV and Android TV devices should work too, but haven't been tested yet. Not Fire TV, Samsung, LG or Roku. Details in [docs/SETUP.md](docs/SETUP.md#will-it-work-on-my-tv).
+
+**Setting it up with an AI assistant:** clone this repo, open it in Claude Code, Codex or Gemini CLI, and ask it to help you install it on your TV. [AGENTS.md](AGENTS.md) tells it how, step by step, without ever asking for your keys in the chat.
+
 ## The problem
 
 You want to watch *Predator*. Is it in your own library? On Netflix? Hulu? Rent-only? Today you open four apps to find out.

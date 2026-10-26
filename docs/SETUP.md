@@ -1,8 +1,23 @@
 # Set it up on your own TV
 
-This guide takes you from nothing to the Search app running on your Android TV. It was built and tested on an NVIDIA SHIELD TV. Other Android TV devices running Android 8.0 or later should work, but haven't been tested.
+This guide takes you from nothing to the Search app running on your Android TV.
 
 There's no app store version yet. You build the app on your computer with your own keys, then install it on your TV over the network. Plan on about an hour the first time.
+
+**Rather have an AI assistant walk you through it?** Download the repo (`git clone https://github.com/anand951/stella-tvsearch`), open that folder in Claude Code, Codex or Gemini CLI, and say: *"Help me install this on my TV. My TV is a <brand and model>."* It reads [AGENTS.md](../AGENTS.md), which tells it to go one step at a time and never to ask for your keys in the chat.
+
+## Will it work on my TV?
+
+| TV | Works? |
+|---|---|
+| NVIDIA SHIELD TV | Yes, tested |
+| TVs with Google TV or Android TV built in (Sony, TCL, Hisense, Philips and others), Chromecast with Google TV, Google TV Streamer | Should work, not tested yet. Needs Android 8.0 or later |
+| Amazon Fire TV | Not yet. Its streaming apps are different builds, so opening a title in them would need its own rules |
+| Samsung, LG, Roku, Apple TV | No. They don't run Android apps |
+
+If you try it on a TV that isn't listed as tested, please open an issue saying how it went.
+
+You don't need to change your TV's home screen to use this. It's an ordinary app, and works alongside the stock home screen or a replacement such as [CleanYourTV](https://github.com/Gathin23/cleanyourtv).
 
 ## What you need
 
@@ -56,12 +71,18 @@ The app doesn't store a Plex token. Instead, Plex lets your TV in without signin
 
 ## 4. Turn on network debugging on the TV
 
-On a SHIELD TV:
+**On a SHIELD TV:**
 
 1. **Settings → Device Preferences → About**. Scroll to **Build** and press OK on it seven times, until it says you're a developer.
 2. Go back to **Device Preferences → Developer options** and turn on **Network debugging**. Note the address it shows (the TV's IP).
 
-Other Android TVs have the same steps, sometimes under different names (USB debugging, ADB debugging).
+**On Google TV and most TVs with Android TV built in:**
+
+1. **Settings → System → About**. Press OK on **Android TV OS build** seven times.
+2. Go back to **System → Developer options** and turn on **USB debugging**. If there's also a **Network debugging** or **ADB debugging** switch, turn that on too.
+3. Find the TV's IP under **Settings → Network & Internet**, on the network you're connected to.
+
+Some newer Google TV models don't accept a network connection that way. If `adb connect` in step 6 fails, use **Developer options → Wireless debugging** instead: turn it on, choose **Pair device with pairing code**, then on your computer run `adb pair <tv-ip>:<pairing port>` and type the code. Then `adb connect <tv-ip>:<port>` with the port shown on the Wireless debugging screen.
 
 ## 5. Install the build tools on your computer
 
@@ -86,9 +107,15 @@ cd android
 
 The first `adb connect` shows a prompt on the TV. Choose **Always allow from this computer**, then run `adb connect` again. If Gradle can't find Java, put `JAVA_HOME=/path/to/jdk17` in front of `./gradlew`.
 
+On Windows, do all of this inside WSL (Ubuntu). On a Mac, if `adb connect` says "No route to host", allow your terminal under **System Settings → Privacy & Security → Local Network**.
+
 The app appears in the TV's app list as **Search**. Move it to your favourites row to keep it handy.
 
 The first time it opens, it downloads its title list from TMDB (about a minute). It refreshes the list weekly by itself.
+
+## 7. Turn debugging off
+
+Network debugging leaves an unencrypted door open on your home network. Once the app is installed, go back to **Developer options** and turn **Network debugging**, **USB debugging** and **Wireless debugging** off. Turn them on again only when you want to update the app.
 
 ## Which apps it can open
 
