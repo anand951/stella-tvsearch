@@ -4,6 +4,8 @@
 
 > Stella is the labradoodle mascot who shows you where you are on the screen.
 
+![Searching "predator": posters from your Plex library and streaming services in one row, with where to watch each one](docs/screenshots/search-results.jpg)
+
 Status: **working app for Android TV**, in daily use on an NVIDIA SHIELD TV. There's no app store version yet: you build it with your own free API keys. See [docs/SETUP.md](docs/SETUP.md).
 
 **Works on:** NVIDIA SHIELD TV (tested). Google TV and Android TV devices should work too, but haven't been tested yet. Not Fire TV, Samsung, LG or Roku. Details in [docs/SETUP.md](docs/SETUP.md#will-it-work-on-my-tv).
@@ -30,6 +32,13 @@ Type a title once and get one result list:
 Select a result and it opens straight into the right app, on the right title. Results are ranked: things you already own first, then your subscriptions, then free services, then rentals.
 
 Found something for later? **Add to watchlist** saves it on the TV itself (no account, no Plex needed). Open Search with nothing typed, or press **Watchlist** beside the search box, to see your saved titles with up-to-date info on where each one is playing.
+
+| | |
+|---|---|
+| ![Stella sits beside the selected way to watch: Plex in 4K, Hulu included in your plan, Prime Video and Apple TV to rent or buy](docs/screenshots/where-to-watch.jpg) | ![After pressing Add to watchlist: the button turns green, and the title gets a bookmark](docs/screenshots/add-to-watchlist.jpg) |
+| *Where to watch, cheapest first: your library, then what you already pay for, then rentals* | *Save a title for later* |
+| ![The watchlist, newest first, each with up-to-date info on where it's streaming](docs/screenshots/watchlist.jpg) | |
+| *Your watchlist, with where each title is playing today* | |
 
 ## Documents
 
