@@ -62,4 +62,9 @@ API keys never go in this repo. Locally, the Streaming Availability key lives at
 
 Copyright 2026 Anand Sheth. Licensed under the [Apache License, Version 2.0](LICENSE).
 
-The Figtree font in `android/app/src/main/assets` is under the SIL Open Font License ([android/FONT-LICENSE-OFL.txt](android/FONT-LICENSE-OFL.txt)). Streaming data comes from the Streaming Availability API and title data from TMDB, each under its own terms. This product uses the TMDB API but is not endorsed or certified by TMDB.
+The Figtree font in `android/app/src/main/assets` is under the SIL Open Font License ([android/FONT-LICENSE-OFL.txt](android/FONT-LICENSE-OFL.txt)). Streaming data comes from the Streaming Availability API and title data from TMDB, each under its own terms.
+
+## Credits
+
+- Movie and show data and posters: [TMDB](https://www.themoviedb.org). This application uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.
+- Where-to-watch data, prices and service logos (including those in the screenshots above): the [Streaming Availability API](https://www.movieofthenight.com/about/api) by Movie of the Night.
