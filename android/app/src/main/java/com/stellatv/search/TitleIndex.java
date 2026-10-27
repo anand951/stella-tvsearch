@@ -77,6 +77,8 @@ final class TitleIndex {
 
     boolean enabled() { return token != null && !token.isEmpty(); }
     boolean ready() { return !entries.isEmpty(); }
+    int size() { return entries.size(); }
+    long updated() { return file.lastModified(); }
     boolean stale() { return oldFormat || !file.exists() || System.currentTimeMillis() - file.lastModified() > MAX_AGE_MS; }
 
     /** Loads the saved list, if any. Call off the main thread. */

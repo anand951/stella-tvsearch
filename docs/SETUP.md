@@ -131,6 +131,8 @@ Edit `~/.config/stella-tv/config.json` (or a key file), then repeat step 6. Sett
 
 ## If something doesn't work
 
+Start with **About** (the ⓘ at the top right of the app). It shows whether each source is working, and what to fix if one isn't.
+
 | Symptom | Likely cause |
 |---|---|
 | No Plex results | The TV's IP isn't on Plex's "allowed without auth" list, or `plex.url` uses `localhost` instead of the server's network address |

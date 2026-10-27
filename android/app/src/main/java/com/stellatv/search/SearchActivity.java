@@ -80,7 +80,10 @@ public class SearchActivity extends Activity {
     private EditText input;
     private TextView status, hint, dTitle, dMeta, dOverview, saveLabel, savedNote, listCount;
     private LinearLayout posters, chips, details, saveButton, listButton;
-    private Icon saveIcon, listIcon;
+    private Icon saveIcon, listIcon, aboutIcon;
+    private FrameLayout aboutButton;
+    private TextView aboutLabel;
+    private AboutPanel about;
     private View emptyList;
     private View watchPanel, watchFade;
     private WhereToWatch whereToWatch;
@@ -201,8 +204,36 @@ public class SearchActivity extends Activity {
         input.setNextFocusRightId(listButton.getId());
 
         status = Ui.text(this, 26, 500, 0x99FFFFFF);
+        status.setSingleLine(false);
+        status.setMaxLines(2);
         status.setEllipsize(TextUtils.TruncateAt.END);
-        root.addView(status, at(1450, 64, 420, 40));
+        status.setGravity(Gravity.CENTER_VERTICAL);
+        root.addView(status, at(1390, 40, 310, 80));
+
+        // About, in the top-right corner: sources and credits
+        aboutButton = new FrameLayout(this);
+        aboutButton.setId(View.generateViewId());
+        aboutButton.setFocusable(true);
+        aboutButton.setFocusableInTouchMode(true);
+        aboutButton.setContentDescription("About");
+        aboutIcon = new Icon(this);
+        aboutButton.addView(aboutIcon, new FrameLayout.LayoutParams(Ui.px(40), Ui.px(40), Gravity.CENTER));
+        root.addView(aboutButton, at(1728, 40, 80, 80));
+        aboutLabel = Ui.text(this, 24, 700, Color.WHITE);
+        aboutLabel.setText("About");
+        aboutLabel.setGravity(Gravity.CENTER_HORIZONTAL);
+        aboutLabel.setVisibility(View.INVISIBLE);
+        root.addView(aboutLabel, at(1688, 136, 160, 32));
+        aboutButton.setOnClickListener(v -> openAbout());
+        aboutButton.setOnFocusChangeListener((v, has) -> {
+            styleAboutButton();
+            v.animate().scaleX(has ? 1.05f : 1f).scaleY(has ? 1.05f : 1f).setDuration(160).start();
+        });
+        styleAboutButton();
+        listButton.setNextFocusRightId(aboutButton.getId());
+        aboutButton.setNextFocusLeftId(listButton.getId());
+        aboutButton.setNextFocusRightId(aboutButton.getId());
+        aboutButton.setNextFocusUpId(aboutButton.getId());
 
         // Poster row
         posterScroll = new HorizontalScrollView(this);
@@ -291,6 +322,9 @@ public class SearchActivity extends Activity {
         mascot = new MascotView(this);
         mascot.setVisibility(View.INVISIBLE);
         root.addView(mascot, new FrameLayout.LayoutParams(Ui.px(120), Math.round(Ui.px(120) * MascotView.GRID_H / MascotView.GRID_W)));
+
+        about = new AboutPanel(this, this::closeAbout);
+        root.addView(about.view, new FrameLayout.LayoutParams(-1, -1));
     }
 
     // ---- Searching -------------------------------------------------------------------------
@@ -351,7 +385,9 @@ public class SearchActivity extends Activity {
         }
         showPosters(titles);
         if (titles.isEmpty()) {
-            showHint("Nothing found for “" + q + "”");
+            boolean sourceOff = !streaming.enabled() || !index.enabled();
+            showHint("Nothing found for “" + q + "”"
+                    + (sourceOff ? "\nSome sources are off. About, at the top right, says why." : ""));
             return;
         }
         hint.setVisibility(View.GONE);
@@ -451,6 +487,54 @@ public class SearchActivity extends Activity {
         listCount.setVisibility(n == 0 ? View.GONE : View.VISIBLE);
         listCount.setTextColor(showingWatchlist ? Color.WHITE : 0xFF0B0D12);
         listCount.setBackground(Ui.rounded(showingWatchlist ? 0xFF0B0D12 : Color.WHITE, 21, 0, 0));
+    }
+
+    /** White when focused, like the other buttons in the top row; the "About" label shows below it. */
+    private void styleAboutButton() {
+        boolean focused = aboutButton.isFocused();
+        aboutButton.setBackground(focused ? Ui.rounded(Color.WHITE, 40, 0, 0) : Ui.rounded(0x1AFFFFFF, 40, 0x59FFFFFF, 2));
+        aboutIcon.set(Icon.INFO, focused ? 0xFF0B0D12 : Color.WHITE);
+        aboutLabel.setVisibility(focused ? View.VISIBLE : View.INVISIBLE);
+    }
+
+    // ---- About -------------------------------------------------------------------------------
+    private void openAbout() {
+        hideKeyboard();
+        about.clearSources();
+        String country = new Locale("", BuildConfig.COUNTRY.toUpperCase(Locale.ROOT)).getDisplayCountry(Locale.US);
+        if (streaming.enabled()) {
+            about.addSource("Where to watch", AboutPanel.ON, "On, for " + country);
+        } else {
+            about.addSource("Where to watch", AboutPanel.PROBLEM, "Off: no Streaming Availability key was found when "
+                    + "this app was built. See docs/SETUP.md, step 1.");
+        }
+        if (!index.enabled()) {
+            about.addSource("Title list", AboutPanel.PROBLEM, "Off: no TMDB token was found when this app was built, "
+                    + "so search finds whole words only. See docs/SETUP.md, step 1.");
+        } else if (index.ready()) {
+            long updated = index.updated();
+            about.addSource("Title list", AboutPanel.ON, String.format(Locale.US, "%,d titles", index.size())
+                    + (updated > 0 ? ", updated " + new SimpleDateFormat("MMM d", Locale.US).format(new Date(updated)) : ""));
+        } else {
+            about.addSource("Title list", AboutPanel.OFF, "Getting ready. Until then, press Search to search.");
+        }
+        if (!plex.enabled()) {
+            about.addSource("Plex", AboutPanel.OFF, "Not set up (optional)");
+        } else {
+            TextView line = about.addSource("Plex", AboutPanel.OFF, "Checking…");
+            io.submit(() -> {
+                boolean ok = plex.reachable();
+                ui.post(() -> AboutPanel.setState(line, ok ? AboutPanel.ON : AboutPanel.PROBLEM, ok
+                        ? "Connected to your server"
+                        : "Can't reach your server. Is it on, and is this TV on its allowed list? See docs/SETUP.md, step 3."));
+            });
+        }
+        about.open();
+    }
+
+    private void closeAbout() {
+        about.hide();
+        aboutButton.requestFocus();
     }
 
     /** A green bookmark on a search result that's already on the watchlist. */
@@ -748,7 +832,7 @@ public class SearchActivity extends Activity {
 
     // ---- Stella ----------------------------------------------------------------------------
     private void onFocus(View v) {
-        if (v == null || v == input || v.getParent() == null) {
+        if (v == null || v == input || v == aboutButton || about.isOpen() || v.getParent() == null) {
             mascotTarget = null;
             mascot.setVisibility(View.INVISIBLE);
             return;
@@ -804,6 +888,10 @@ public class SearchActivity extends Activity {
 
     // ---- Keys --------------------------------------------------------------------------------
     @Override public void onBackPressed() {
+        if (about.isOpen()) {
+            closeAbout();
+            return;
+        }
         if (getCurrentFocus() != input && input.getText().length() > 0) {
             input.requestFocus();
             input.setSelection(input.getText().length());
@@ -817,7 +905,8 @@ public class SearchActivity extends Activity {
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
         // From the search bar, Down jumps to the results (when the keyboard isn't using the key).
         if (e.getAction() == KeyEvent.ACTION_DOWN && e.getKeyCode() == KeyEvent.KEYCODE_DPAD_DOWN
-                && (getCurrentFocus() == input || getCurrentFocus() == listButton) && posters.getChildCount() > 0) {
+                && (getCurrentFocus() == input || getCurrentFocus() == listButton || getCurrentFocus() == aboutButton)
+                && posters.getChildCount() > 0) {
             hideKeyboard();
             posters.getChildAt(0).requestFocus();
             return true;
@@ -859,9 +948,9 @@ public class SearchActivity extends Activity {
         return lp;
     }
 
-    /** Small line icons: plus, check, and a bookmark (outline or filled). Drawn on a 24-unit grid. */
+    /** Small line icons: plus, check, a bookmark (outline or filled), and an "i" in a circle. Drawn on a 24-unit grid. */
     private static final class Icon extends View {
-        static final int PLUS = 0, CHECK = 1, BOOKMARK = 2, BOOKMARK_FILLED = 3;
+        static final int PLUS = 0, CHECK = 1, BOOKMARK = 2, BOOKMARK_FILLED = 3, INFO = 4;
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path path = new Path();
         private int shape;
@@ -895,6 +984,13 @@ public class SearchActivity extends Activity {
                     path.lineTo(9.5f * s, 17 * s);
                     path.lineTo(19 * s, 7.5f * s);
                     break;
+                case INFO:
+                    p.setStrokeWidth(2.2f * s);
+                    c.drawCircle(12 * s, 12 * s, 9.5f * s, p);
+                    c.drawLine(12 * s, 11 * s, 12 * s, 17 * s, p);
+                    p.setStyle(Paint.Style.FILL);
+                    c.drawCircle(12 * s, 7.4f * s, 1.4f * s, p);
+                    return;
                 default:
                     p.setStrokeWidth(2 * s);
                     path.moveTo(6.5f * s, 3.5f * s);

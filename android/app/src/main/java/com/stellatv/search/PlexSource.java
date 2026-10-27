@@ -27,6 +27,16 @@ final class PlexSource {
         return !url.isEmpty();
     }
 
+    /** Whether the server answers this TV. Call off the main thread. */
+    boolean reachable() {
+        try {
+            Http.get(url + "/identity", JSON);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     List<Catalog.Title> search(String query) throws Exception {
         if (machineId == null) {
             machineId = new JSONObject(Http.getString(url + "/identity", JSON))
